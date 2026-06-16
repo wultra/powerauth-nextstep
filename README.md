@@ -9,7 +9,7 @@ credentials and OTP codes, exposing all of this functionality through REST servi
 
 ## Documentation
 
-For the most recent documentation and tutorials, please visit [PowerAuth Web Flow Documentation](https://developers.wultra.com/docs/develop/powerauth-webflow/).
+For the most recent documentation and tutorials, please visit [PowerAuth Next Step Server Documentation](https://developers.wultra.com/components/powerauth-webflow/develop/documentation/Next-Step-Server).
 
 
 ## License
