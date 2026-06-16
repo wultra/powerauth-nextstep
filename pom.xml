@@ -68,23 +68,6 @@
         <module>powerauth-nextstep</module>
         <module>powerauth-nextstep-client</module>
         <module>powerauth-nextstep-model</module>
-        <module>powerauth-webflow</module>
-        <module>powerauth-webflow-authentication</module>
-        <module>powerauth-webflow-authentication-init</module>
-        <module>powerauth-webflow-authentication-form</module>
-        <module>powerauth-webflow-authentication-login-sca</module>
-        <module>powerauth-webflow-authentication-operation-review</module>
-        <module>powerauth-webflow-authentication-mtoken</module>
-        <module>powerauth-webflow-authentication-sms</module>
-        <module>powerauth-webflow-authentication-approval-sca</module>
-        <module>powerauth-webflow-authentication-consent</module>
-        <module>powerauth-webflow-i18n</module>
-        <module>powerauth-webflow-resources</module>
-        <module>powerauth-webflow-client</module>
-        <module>powerauth-mtoken-model</module>
-        <module>powerauth-tpp-engine</module>
-        <module>powerauth-tpp-engine-model</module>
-        <module>powerauth-tpp-engine-client</module>
     </modules>
 
     <properties>
@@ -131,12 +114,6 @@
 
             <dependency>
                 <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-mtoken-model</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
                 <artifactId>powerauth-nextstep-client</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -144,78 +121,6 @@
             <dependency>
                 <groupId>com.wultra.security</groupId>
                 <artifactId>powerauth-nextstep-model</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-tpp-engine-model</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-authentication</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-authentication-approval-sca</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-authentication-consent</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-authentication-form</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-authentication-init</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-authentication-login-sca</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-authentication-mtoken</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-authentication-operation-review</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-authentication-sms</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-i18n</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.wultra.security</groupId>
-                <artifactId>powerauth-webflow-resources</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
