@@ -110,7 +110,7 @@
         <powerauth.version>2.0.1</powerauth.version>
         <powerauth-rest.version>2.1.0-SNAPSHOT</powerauth-rest.version>
         <powerauth-crypto.version>2.1.0-SNAPSHOT</powerauth-crypto.version>
-        <powerauth-push.version>2.0.1</powerauth-push.version>
+        <powerauth-push.version>2.1.0</powerauth-push.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
     </properties>
 
