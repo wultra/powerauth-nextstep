@@ -1,12 +1,16 @@
-# PowerAuth Web Flow
+# PowerAuth Next Step
 
-PowerAuth Web Flow is an authentication and authorization server for web applications. It allows user authentication and operation authorization using OAuth 2.1 protocol, and it supports multiple authentication methods, such as username / password verification, PowerAuth data signature verification (both online and offline), and OTP code verification. Web Flow supports multi-factor authentication and enforces Strong Customer Authentication (SCA) when required by the use case, e.g. in case of protection of PSD2 APIs.
+PowerAuth Next Step Server resolves the next step of the authentication process, handles authentication using credentials 
+and OTP authorization codes, and manages user identities. Based on configurable step definitions, it decides the next 
+authentication step for an operation given the operation name, type, status, and the result of the previous step. 
+It also manages authentication methods, operations, organizations, credential and OTP policies, and securely stores user 
+credentials and OTP codes, exposing all of this functionality through REST services.
 
-The typical use-case for the software stack is securing RESTful API interfaces, or authentication / authorization for internet banking via a central authentication / authorization component.
 
 ## Documentation
 
 For the most recent documentation and tutorials, please visit [PowerAuth Web Flow Documentation](https://developers.wultra.com/docs/develop/powerauth-webflow/).
+
 
 ## License
 
