@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!--
+~ PowerAuth Web Flow and related software components
+~ Copyright 2017 Wultra s.r.o.
+~
+~ This program is free software: you can redistribute it and/or modify
+~ it under the terms of the GNU Affero General Public License as published
+~ by the Free Software Foundation, either version 3 of the License, or
+~ (at your option) any later version.
+~
+~ This program is distributed in the hope that it will be useful,
+~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+~ GNU Affero General Public License for more details.
+~
+~ You should have received a copy of the GNU Affero General Public License
+~ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+<html xmlns:th="http://www.w3.org/1999/xhtml">
+<head lang="en">
+    <meta http-equiv="X-UA-Compatible" content="IE=11, IE=10, IE=9, IE=edge"/>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:inline="text">[[${title}]]</title>
+    <link rel="stylesheet" href="./resources/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="./resources/css/react-select.css"/>
+    <link rel="stylesheet" href="./ext-resources/css/base.css"/>
+    <link rel="stylesheet" th:if="${stylesheet != null}" th:href="${stylesheet}"/>
+    <link rel="stylesheet" href="./ext-resources/css/customization.css"/>
+    <th:block th:if="${afs_js_snippet_url != null and !afs_js_snippet_url.empty}">
+        <!-- AFS integration -->
+        <script type="text/javascript" th:src="${afs_js_snippet_url}" async="async"></script>
+    </th:block>
+</head>
+<body>
+
+<script type="text/javascript" th:inline="javascript">
+    /*<![CDATA[*/
+    var lang = [[${lang}]];
+    var languageSetting = JSON.parse([[${languageSetting}]]);
+    var I18N_EN = {locale: 'en', messages: JSON.parse(/*[[${i18n_EN}]]*/)};
+    var I18N_CS = {locale: 'cs', messages: JSON.parse(/*[[${i18n_CS}]]*/)};
+    var I18N_UK = {locale: 'uk', messages: JSON.parse(/*[[${i18n_UK}]]*/)};
+    var I18N_RO = {locale: 'ro', messages: JSON.parse(/*[[${i18n_RO}]]*/)};
+
+    var csrf = {headerName: [[${_csrf.headerName}]], token: [[${_csrf.token}]]};
+
+    var operationHash = [[${operationHash}]];
+    var usernameMaxLength = [[${usernameMaxLength}]];
+    var passwordMaxLength = [[${passwordMaxLength}]];
+    var smsOtpMaxLength = [[${smsOtpMaxLength}]];
+    var showAndroidSecurityWarning = [[${showAndroidSecurityWarning}]];
+    var consentPanelLimitEnabled = [[${consentPanelLimitEnabled}]];
+    var consentPanelLimitCharacters = [[${consentPanelLimitCharacters}]];
+
+    // ICAClientSign configuration
+    const approvalCertificateEnabled = [[${approvalCertificateEnabled}]];
+    const approvalCertificateSigner = [[${approvalCertificateSigner}]];
+    const icaConfigurationUrl = [[${icaConfigurationUrl}]];
+    const icaLogLevel = [[${icaLogLevel}]];
+    const extensionOwner = [[${icaExtensionOwner}]];
+    const extensionIDChrome = [[${icaExtensionIDChrome}]];
+    const extensionIDOpera = [[${icaExtensionIDOpera}]];
+    const extensionIDEdge = [[${icaExtensionIDEdge}]];
+    const extensionIDFirefox = [[${icaExtensionIDFirefox}]];
+    const extensionInstallURLFirefox = [[${icaExtensionInstallURLFirefox}]];
+
+    const webSocketSupportEnabled = [[${webSocketSupportEnabled}]];
+    
+    window.onbeforeunload = function() {
+        // Modern browsers do not allow custom messages, so text will be only shown in old browsers.
+        // Note that the onbeforeunload dialog does not appear in case user does no action, see:
+        // https://bugs.chromium.org/p/chromium/issues/detail?id=707007
+        if (lang === 'en') {
+            return I18N_EN.messages['browser.close.warning'];
+        }
+        if (lang === 'cs') {
+            return I18N_CS.messages['browser.close.warning'];
+        }
+        return I18N_EN.messages['browser.close.warning'];
+    };
+    /*]]>*/
+</script>
+
+<div class="background">
+</div>
+
+<div id="page-wrap">
+    <div id="react"></div>
+</div>
+
+<script src="./resources/js/built/bundle.js"></script>
+
+</body>
+</html>
