@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright 2017 Wultra s.r.o.
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <artifactId>powerauth-webflow-parent</artifactId>
+        <groupId>io.getlime.security</groupId>
+        <version>0.21.1</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>powerauth-webflow-authentication-mtoken</artifactId>
+    <name>powerauth-webflow-authentication-mtoken</name>
+    <groupId>io.getlime.security</groupId>
+    <version>0.21.1</version>
+
+    <dependencies>
+
+        <!-- Spring Dependencies -->
+        <dependency>
+            <groupId>org.springframework.ws</groupId>
+            <artifactId>spring-ws-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-messaging</artifactId>
+            <version>4.3.21.RELEASE</version>
+        </dependency>
+
+        <!-- PowerAuth Dependencies -->
+        <dependency>
+            <groupId>io.getlime.security</groupId>
+            <artifactId>powerauth-webflow-authentication</artifactId>
+            <version>0.21.1</version>
+        </dependency>
+        <dependency>
+            <groupId>io.getlime.security</groupId>
+            <artifactId>powerauth-restful-security-spring</artifactId>
+            <version>0.21.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.getlime.security</groupId>
+            <artifactId>powerauth-push-client</artifactId>
+            <version>0.21.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.getlime.security</groupId>
+            <artifactId>powerauth-mtoken-model</artifactId>
+            <version>0.21.1</version>
+        </dependency>
+
+        <!-- Other Dependencies -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.3.3</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>3.3.3</version>
+        </dependency>
+    </dependencies>
+
+    <profiles>
+        <profile>
+            <id>jdk9</id>
+            <activation>
+                <jdk>[1.9,)</jdk>
+            </activation>
+            <dependencies>
+                <!-- JDK 9 dependencies -->
+                <dependency>
+                    <groupId>javax.xml.bind</groupId>
+                    <artifactId>jaxb-api</artifactId>
+                    <version>${jaxb.version}</version>
+                    <!-- Library should be provided by runtime, otherwise there would be conflicts with jar bundled in war. -->
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

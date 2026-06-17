@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.w3.org/1999/xhtml">
+<head lang="en">
+    <meta http-equiv="X-UA-Compatible" content="IE=11, IE=10, IE=9, IE=edge"/>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:inline="text">[[${title}]]</title>
+    <link rel="stylesheet" href="./resources/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="./resources/css/react-select.css"/>
+    <link rel="stylesheet" href="./ext-resources/css/base.css"/>
+    <link rel="stylesheet" th:if="${stylesheet != null}" th:href="${stylesheet}"/>
+    <link rel="stylesheet" href="./ext-resources/css/customization.css"/>
+</head>
+<body>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    var lang = [[${lang}]];
+
+    var I18N_EN = {locale: 'en', messages: JSON.parse(/*[[${i18n_EN}]]*/)};
+    var I18N_CS = {locale: 'cs', messages: JSON.parse(/*[[${i18n_CS}]]*/)};
+
+    var csrf = {headerName: [[${_csrf.headerName}]], token: [[${_csrf.token}]]};
+
+    var operationHash = [[${operationHash}]];
+    /*]]>*/
+</script>
+
+<div class="background">
+</div>
+
+<div id="page-wrap">
+    <div id="react"></div>
+</div>
+
+<script src="./resources/js/built/bundle.js"></script>
+
+</body>
+</html>
