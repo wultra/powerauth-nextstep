@@ -1,8 +1,8 @@
 # Database Table Structure
 
-Web Flow requires a database to store data. It is tested with Oracle and PostgreSQL. It should be easily adapted to any other SQL database which supports JDBC.
+Next Step requires a database to store data. It is tested with Oracle and PostgreSQL. It should be easily adapted to any other SQL database which supports JDBC.
 
-Web Flow can coexist with PowerAuth in the same database schema, or it can use a different database schema.
+Next Step can coexist with PowerAuth in the same database schema, or it can use a different database schema.
 
 ## Database Scripts
 
@@ -20,23 +20,15 @@ Web Flow can coexist with PowerAuth in the same database schema, or it can use a
 
 ## Database Tables
 
-### Database Tables for the OAuth 2.1 protocol
-
-- **oauth2_authorization** - the table stores OAuth 2.1 authorization codes, access tokens and refresh tokens
-
-- **oauth2_registered_client** - the table stores OAuth 2.1 client registrations
-
-- **oauth2_authorization_consent** - the table stores OAuth 2.1 consents (only added for compatibility with Spring Authorization Server)
-
 ### Database Tables for the Next Step Server
 
-- **ns_auth_method** - the table stores configuration of authentication methods. Data in this table needs to be loaded before Web Flow is started.
+- **ns_auth_method** - the table stores configuration of authentication methods. Data in this table needs to be loaded before Next Step is started.
 
 - **ns_user_prefs** - the table stores user preferences. Status of authentication methods is stored in this table per user (methods can be enabled or disabled).
 
-- **ns_operation** - the table stores details of Web Flow operations. Only the last status is stored in this table, changes of operations are stored in table ns_operation_history.
+- **ns_operation** - the table stores details of operations. Only the last status is stored in this table, changes of operations are stored in table ns_operation_history.
 
-- **ns_operation_config** - the table stores configuration of Web Flow operations including configuration of mobile templates. Data in this table needs to be loaded before Web Flow is started.
+- **ns_operation_config** - the table stores configuration of operations including configuration of mobile templates. Data in this table needs to be loaded before Next Step is started.
 
 - **ns_operation_method_config** - the table stores configuration of authentication methods per operation name.
 
@@ -44,7 +36,7 @@ Web Flow can coexist with PowerAuth in the same database schema, or it can use a
 
 - **ns_organization** - the table stores definitions of organizations.
 
-- **ns_step_definition** - the table stores definitions of authentication/authorization steps. Data in this table needs to be loaded before Web Flow is started.
+- **ns_step_definition** - the table stores definitions of authentication/authorization steps. Data in this table needs to be loaded before Next Step is started.
 
 - **ns_operation_afs** - the table stores responses from AFS for operations.
 
@@ -80,33 +72,11 @@ Web Flow can coexist with PowerAuth in the same database schema, or it can use a
 
 - **ns_authentication** - the table stores user authentication attempts.
 
-### Database Tables for the Data Adapter
+### Database Table for Scheduled Task Locking
 
-- **da_sms_authorization** - the table stores data for SMS OTP authorization.
+- **shedlock** - the table prevents execution of the same scheduled task from more than one node.
 
-- **da_user_credentials** - the table stores user credentials.
-
-### Database Tables for the Web Flow Server
-
-- **wf_operation_session** - the table stores mapping of operations to HTTP sessions.
-
-- **wf_afs_config** - the table stores configuration of anti-fraud system integration.
-
-- **wf_certificate_verification** - the table stores results of TLS certificate verifications.
-
-### Database Tables for the Third Party Provider
-
-- **tpp_consent** - the table stores definitions of consents.
-
-- **tpp_user_consent** - the table stores consents given by the user.
-
-- **tpp_user_consent_history** - the table stores changes of consents given by the user.
-
-- **tpp_detail** - the table stores information about third parties.
-
-- **tpp_app_detail** - the table store information about third party applications.
-
-### Database Tables for the auditing functionality
+### Database Tables for the Auditing Functionality
 
 - **audit_log** - the table stores audit records.
 
