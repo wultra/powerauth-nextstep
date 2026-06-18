@@ -68,23 +68,6 @@ New 'greeting' and 'summary' attributes:
         formData.addSummary("operation.summary");
 ```
 
-### CSS resources change
-
-Previously there was one main CSS file used in Web Flow:
-* `main.css` - used for all CSS styles, updated using the [customization](https://github.com/wultra/powerauth-webflow-customization) project
-
-We split this file into two CSS files in order to make CSS customization easier:
-* `base.css` - CSS styles used by Web Flow in default page design
-* `customization.css` - customized CSS styles for custom page design
-
-The CSS files are be updated using the [ext-resources](https://github.com/wultra/powerauth-webflow-customization/tree/master/ext-resources) folder.
-
-The migration steps are following:
-* Identify CSS differences in current `main.css` file vs. [default CSS](https://github.com/wultra/powerauth-webflow-customization/blob/master/ext-resources/css/base.css) in Web Flow.
-* Place [base.css](https://github.com/wultra/powerauth-webflow-customization/blob/master/ext-resources/css/base.css) in your ext-resources folder.
-* Move identified CSS differences into file [customization.css](https://github.com/wultra/powerauth-webflow-customization/blob/master/ext-resources/css/customization.css) in your ext-resources folder.
-* Delete the original `main.css` file in your ext-resources folder.
-
 ### Form data value formatting
 
 Web Flow now supports value formatting. Following formats can be specified when creating operation for individual fields:

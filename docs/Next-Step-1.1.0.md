@@ -1224,20 +1224,6 @@ The encryption keys need to be configured in the following scenarios:
 
 If you want to enable operations support for PowerAuth server, configuration operation templates in PowerAuth server first and then set property `powerauth.nextstep.pa.operations.enabled` to value `true`.
 
-## Web Flow Application Configuration
-
-The Web Flow application contains new application properties which can be configured.
-
-```properties
-# Enable or disable operations support in PowerAuth server
-powerauth.webflow.pa.operations.enabled=false
-
-# Configuration of authentication using temporary credentials
-powerauth.webflow.authentication.allowTemporaryCredentials=false
-```
-
-If you want to enable operations support for PowerAuth server, configuration operation templates in PowerAuth server first, enable operations in Next Step server, and then set property `powerauth.webflow.pa.operations.enabled` to value `true`.
-
 ## Data Adapter Changes
 
 The Data Adapter interface contains two new methods which should be implemented:
