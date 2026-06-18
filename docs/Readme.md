@@ -39,14 +39,12 @@ Web Flow can be integrated with anti-fraud systems, provide information for frau
 
 ## Deployment
 
-- [Deploying Web Flow on JBoss / Wildfly](./Deploying-Wildfly.md)
+- [Deploying Next Step on JBoss / Wildfly](./Deploying-Wildfly.md)
 - [Database Table Structure](./Database-Table-Structure.md)
 - [Migration Instructions](./Migration-Instructions.md)
 - [Docker Deployment](./Docker-Deployment.md)
 
-## Customizing Web Flow
-- [Customizing Web Flow Appearance](https://github.com/wultra/powerauth-webflow-customization/blob/develop/docs/Customizing-Web-Flow-Appearance.md)
-- [Implementing Data Adapter Interface](https://github.com/wultra/powerauth-webflow-customization/blob/develop/docs/Implementing-the-Data-Adapter-Interface.md)
+## Customizing Next Step
 - [Configuring Next Step](./Configuring-Next-Step.md)
 - [Customizing Operation Form Data](./Customizing-Operation-Form-Data.md)
 - [Mobile Token Configuration](./Mobile-Token-Configuration.md)
@@ -57,4 +55,4 @@ Web Flow can be integrated with anti-fraud systems, provide information for frau
 
 ## Releases
 
-- [Releases](https://github.com/wultra/powerauth-webflow/releases)
+- [Releases](https://github.com/wultra/powerauth-nextstep/releases)

@@ -1,12 +1,12 @@
 # Migration from 1.4.0 to 1.5.0
 
-This guide contains instructions for migration from PowerAuth WebFlow version `1.4.x` to version `1.5.0`.
+This guide contains instructions for migration from PowerAuth Next Step version `1.4.x` to version `1.5.0`.
 
 ## Migration to Spring Boot 3
 
 ### Required Java Version
 
-Web Flow requires Java 17 or higher due to migration to Spring Boot 3. Support for older Java versions is not available.
+Next Step requires Java 17 or higher due to migration to Spring Boot 3. Support for older Java versions is not available.
 
 ## Database Changes
 
