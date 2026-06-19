@@ -1,6 +1,6 @@
 # Migration from 1.9.0 to 1.10.x
 
-This guide contains instructions for migration from PowerAuth WebFlow version `1.9.x` to version `1.10.x`.
+This guide contains instructions for migration from PowerAuth Next Step version `1.9.x` to version `1.10.x`.
 
 
 # 1.10.0
