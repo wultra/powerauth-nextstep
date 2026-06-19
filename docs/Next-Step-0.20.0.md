@@ -158,7 +158,7 @@ Sample usage:
 
 You can omit attributes when they are not available (e.g. payment reference).
 
-For more details, see: [Operation Data Syntax](./Off-line-Signatures-QR-Code.md#operation-data).
+For more details, see: [Operation Data Syntax](./Operation-Data.md#operation-data-overview).
 
 ## Java 9 support
 

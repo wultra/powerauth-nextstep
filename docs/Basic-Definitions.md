@@ -130,7 +130,7 @@ _For example a payment operation contains following data (as string value):_
 "{\"amount\":100,\"currency\":\"CZK\",\"account\":\"238400856/0300\",\"note\":\"Utility Bill Payment - 05/2019\",\"dueDate\":\"2019-06-29\"}"
 ```
 
-Since Web Flow version 0.20.0 the [suggested format of operation data is specified](./Off-line-Signatures-QR-Code.md#operation-data) to allow interpretation of data by Mobile token.
+Since Web Flow version 0.20.0 the [suggested format of operation data is specified](./Operation-Data.md#operation-data-overview) to allow interpretation of data by Mobile token.
 
 ### Operation form data
 
