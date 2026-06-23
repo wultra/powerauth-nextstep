@@ -1,3 +1,4 @@
+-- Changeset powerauth-nextstep/1.10.x/20250520-shedlock.xml::1::Lubos Racansky
 -- Create a new table shedlock
 CREATE TABLE shedlock (name VARCHAR2(64) NOT NULL, lock_until TIMESTAMP NOT NULL, locked_at TIMESTAMP NOT NULL, locked_by VARCHAR2(255) NOT NULL, CONSTRAINT PK_SHEDLOCK PRIMARY KEY (name));
 
@@ -9,4 +10,6 @@ ALTER TABLE ns_credential_storage ADD source VARCHAR2(32) DEFAULT 'LOCAL';
 -- Add column target to ns_credential_storage
 ALTER TABLE ns_credential_storage ADD target VARCHAR2(32) DEFAULT 'LOCAL';
 
+-- Changeset powerauth-nextstep/1.10.x/20250915-add-external-reference::1::Zdenek Cerny
+-- Add column external_reference to ns_credential_storage
 ALTER TABLE ns_credential_storage ADD external_reference VARCHAR2(256);

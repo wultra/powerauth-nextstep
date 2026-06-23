@@ -98,19 +98,6 @@ CREATE TABLE wf_afs_config (
 CREATE UNIQUE INDEX `ns_operation_afs_unique` on `ns_operation_afs` (`operation_id`, `request_afs_action`, `request_step_index`);
 ```
 
-### Configuration of OAuth 2.0 Client
-
-Due to changes in Spring OAuth 2.0 configuration, the redirect URI needs to be specified in the client configuration in database.
-For demo application, you can use this SQL query:
-
-```sql
-UPDATE oauth_client_details SET web_server_redirect_uri = 'http://localhost:8080/powerauth-webflow-client/connect/demo' WHERE client_id='democlient';
-COMMIT;
-```
-
-Note that the URI needs to be updated for each client in each environment. There is typically a different redirect URI 
-for development, testing and production environments.
-
 ### Other Changes
 
 #### Storing Original OAuth 2.0 Scopes
