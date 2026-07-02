@@ -14,7 +14,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.6</version>
+        <version>4.0.7</version>
         <relativePath/> <!-- lookup parent from the repository -->
     </parent>
 
@@ -88,7 +88,7 @@
         <wultra-core.version>2.2.0-SNAPSHOT</wultra-core.version>
         <powerauth.version>2.2.0-SNAPSHOT</powerauth.version>
         <powerauth-crypto.version>2.2.0-SNAPSHOT</powerauth-crypto.version>
-        <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
+        <cyclonedx-maven-plugin.version>2.9.2</cyclonedx-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
