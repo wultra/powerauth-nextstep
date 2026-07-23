@@ -3,7 +3,7 @@
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
 
-    <changeSet id="1" author="Pavel Sindelar" logicalFilePath="powerauth-nextstep/2.1.x/20260407-add-subject-id-to-audit-log.xml">
+    <changeSet id="1" author="Pavel Sindelar" logicalFilePath="powerauth-nextstep/2.2.x/20260407-add-subject-id-to-audit-log.xml">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="audit_log" columnName="subject_id"/>
@@ -17,7 +17,7 @@
         <rollback />
     </changeSet>
 
-    <changeSet id="2" author="Pavel Sindelar" logicalFilePath="powerauth-nextstep/2.1.x/20260407-add-subject-id-to-audit-log.xml">
+    <changeSet id="2" author="Pavel Sindelar" logicalFilePath="powerauth-nextstep/2.2.x/20260407-add-subject-id-to-audit-log.xml">
         <preConditions onFail="MARK_RAN">
             <not>
                 <indexExists tableName="audit_log" indexName="audit_log_subject_id_idx"/>
