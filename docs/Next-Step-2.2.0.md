@@ -1,6 +1,6 @@
-# Migration from 2.0.0 to 2.1.0
+# Migration from 2.0.0 to 2.2.0
 
-This guide contains instructions for migration from PowerAuth Next Step version `2.0.x` to version `2.1.0`.
+This guide contains instructions for migration from PowerAuth Next Step version `2.0.x` to version `2.2.0`.
 
 ## REST API
 
@@ -16,8 +16,8 @@ The main Liquibase script is located in path [db/changelog/db.changelog-master.x
 
 For manual changes use SQL scripts:
 
-- [PostgreSQL script](./sql/postgresql/migration_2.0.0_2.1.0.sql)
-- [Oracle script](./sql/oracle/migration_2.0.0_2.1.0.sql)
+- [PostgreSQL script](sql/postgresql/migration_2.0.0_2.2.0.sql)
+- [Oracle script](./sql/oracle/migration_2.0.0_2.2.0.sql)
 
 ### `audit_log` Table
 
