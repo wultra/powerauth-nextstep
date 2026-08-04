@@ -88,7 +88,7 @@
         <wultra-core.version>2.3.0-SNAPSHOT</wultra-core.version>
         <powerauth.version>2.3.0-SNAPSHOT</powerauth.version>
         <powerauth-crypto.version>2.3.0-SNAPSHOT</powerauth-crypto.version>
-        <cyclonedx-maven-plugin.version>2.9.2</cyclonedx-maven-plugin.version>
+        <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
