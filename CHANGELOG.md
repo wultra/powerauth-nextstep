@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## 2.2.1 - 2026-08-11
+
+### Changed
+
+- Updated wultra-core dependency to 2.2.1 with fix for date serialization in `DefaultRestClient`; Jackson 3 changed the `WRITE_DATES_AS_TIMESTAMPS` default to `false`, which broke clients that parse the timestamps as numbers [(wultra-core#475)](https://github.com/wultra/java-core/issues/475)
+
 ## 2.2.0 - 2026-07-23
 
 ### Changed
