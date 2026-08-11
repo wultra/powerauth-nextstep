@@ -85,8 +85,8 @@
         <logstash.version>9.0</logstash.version>
 
         <!--  Wultra dependencies  -->
-        <wultra-core.version>2.2.0</wultra-core.version>
-        <powerauth.version>2.2.0</powerauth.version>
+        <wultra-core.version>2.2.1</wultra-core.version>
+        <powerauth.version>2.2.1</powerauth.version>
         <powerauth-crypto.version>2.2.0</powerauth-crypto.version>
         <cyclonedx-maven-plugin.version>2.9.2</cyclonedx-maven-plugin.version>
     </properties>
