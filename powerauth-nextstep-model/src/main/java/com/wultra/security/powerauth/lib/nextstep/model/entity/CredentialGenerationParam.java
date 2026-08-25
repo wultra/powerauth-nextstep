@@ -45,5 +45,6 @@ public class CredentialGenerationParam {
     private boolean includeSpecialChars;
     @Positive
     private Integer specialCharsCount;
+    private String specialChars;
 
 }

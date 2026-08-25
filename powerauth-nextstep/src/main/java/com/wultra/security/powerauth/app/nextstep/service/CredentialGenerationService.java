@@ -269,11 +269,15 @@ public class CredentialGenerationService {
             characterRules.add(rule);
         }
         if (includeSpecialChars) {
+            final String specialChars = param.getSpecialChars();
+            final CharacterData specialCharacterData = (specialChars != null && !specialChars.isEmpty())
+                    ? new CustomSpecialCharacters(specialChars)
+                    : new SpecialCharacters();
             final CharacterRule rule;
             if (specialCharsCount == null) {
-                rule = new CharacterRule(new SpecialCharacters());
+                rule = new CharacterRule(specialCharacterData);
             } else {
-                rule = new CharacterRule(new SpecialCharacters(), specialCharsCount);
+                rule = new CharacterRule(specialCharacterData, specialCharsCount);
             }
             characterRules.add(rule);
         }
@@ -315,6 +319,24 @@ public class CredentialGenerationService {
         @Override
         public String getCharacters() {
             return CHARACTERS;
+        }
+    }
+
+    /**
+     * Custom character data definition for a user-configured set of special characters.
+     */
+    private record CustomSpecialCharacters(String characters) implements CharacterData {
+
+        private static final String ERROR_CODE = "INSUFFICIENT_SPECIAL_CHARACTERS";
+
+        @Override
+        public String getErrorCode() {
+            return ERROR_CODE;
+        }
+
+        @Override
+        public String getCharacters() {
+            return characters;
         }
     }
 

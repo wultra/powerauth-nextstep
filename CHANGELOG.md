@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `specialChars` configuration parameter to `CredentialGenerationParam` to allow customizing the set of special characters used during password generation [(#68)](https://github.com/wultra/powerauth-nextstep/issues/68)
+
 ### Changed
 
 - Changed Docker images to be based on the Wultra base image [(#63)](https://github.com/wultra/powerauth-nextstep/issues/63)

@@ -4263,7 +4263,8 @@ The list of expected status codes:
       "includeDigits": true,
       "digitsCount": null,
       "includeSpecialChars": true,
-      "specialCharsCount": null
+      "specialCharsCount": null,
+      "specialChars": null
     },
     "credentialValParam": {
       "includeWhitespaceRule": true,
@@ -4329,7 +4330,8 @@ The list of expected status codes:
       "includeDigits": true,
       "digitsCount": null,
       "includeSpecialChars": true,
-      "specialCharsCount": null
+      "specialCharsCount": null,
+      "specialChars": null
     },
     "credentialValParam": {
       "includeWhitespaceRule": true,
@@ -4450,7 +4452,8 @@ The list of expected status codes:
           "includeDigits": true,
           "digitsCount": null,
           "includeSpecialChars": true,
-          "specialCharsCount": null
+          "specialCharsCount": null,
+      "specialChars": null
         },
         "credentialValParam": {
           "includeWhitespaceRule": true,
@@ -4562,7 +4565,8 @@ The list of expected status codes:
       "includeDigits": true,
       "digitsCount": 1,
       "includeSpecialChars": true,
-      "specialCharsCount": 1
+      "specialCharsCount": 1,
+      "specialChars": null
     },
     "credentialValParam": {
       "includeWhitespaceRule": true,
@@ -4628,7 +4632,8 @@ The list of expected status codes:
       "includeDigits": true,
       "digitsCount": 1,
       "includeSpecialChars": true,
-      "specialCharsCount": 1
+      "specialCharsCount": 1,
+      "specialChars": null
     },
     "credentialValParam": {
       "includeWhitespaceRule": true,

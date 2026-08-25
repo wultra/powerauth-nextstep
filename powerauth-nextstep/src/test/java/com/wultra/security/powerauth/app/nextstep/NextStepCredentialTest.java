@@ -101,6 +101,53 @@ class NextStepCredentialTest extends NextStepTest {
     }
 
     @Test
+    void testGenerateCredentialWithCustomSpecialChars() throws NextStepClientException {
+        String name = UUID.randomUUID().toString();
+        CredentialGenerationParam credentialGenParam = new CredentialGenerationParam();
+        credentialGenParam.setLength(12);
+        credentialGenParam.setIncludeSmallLetters(true);
+        credentialGenParam.setIncludeCapitalLetters(true);
+        credentialGenParam.setIncludeDigits(true);
+        credentialGenParam.setIncludeSpecialChars(true);
+        credentialGenParam.setSmallLettersCount(5);
+        credentialGenParam.setCapitalLettersCount(5);
+        credentialGenParam.setDigitsCount(1);
+        credentialGenParam.setSpecialCharsCount(1);
+        credentialGenParam.setSpecialChars("!@#");
+        updateCredentialDefinition(name, credentialGenParam, null);
+        CreateCredentialResponse r1 = nextStepClient.createCredential("test_user_1", "TEST_CREDENTIAL_GENERATION_VALIDATION", CredentialType.PERMANENT, null, null).getResponseObject();
+        assertNotNull(r1.getUsername());
+        String credentialValue = r1.getCredentialValue();
+        assertEquals(12, credentialValue.length());
+        long customSpecialCount = credentialValue.chars().filter(c -> c == '!' || c == '@' || c == '#').count();
+        assertEquals(1, customSpecialCount);
+    }
+
+    @Test
+    void testGenerateCredentialWithDefaultSpecialChars() throws NextStepClientException {
+        String name = UUID.randomUUID().toString();
+        CredentialGenerationParam credentialGenParam = new CredentialGenerationParam();
+        credentialGenParam.setLength(12);
+        credentialGenParam.setIncludeSmallLetters(true);
+        credentialGenParam.setIncludeCapitalLetters(true);
+        credentialGenParam.setIncludeDigits(true);
+        credentialGenParam.setIncludeSpecialChars(true);
+        credentialGenParam.setSmallLettersCount(5);
+        credentialGenParam.setCapitalLettersCount(5);
+        credentialGenParam.setDigitsCount(1);
+        credentialGenParam.setSpecialCharsCount(1);
+        // No specialChars set - should use default set
+        updateCredentialDefinition(name, credentialGenParam, null);
+        CreateCredentialResponse r1 = nextStepClient.createCredential("test_user_1", "TEST_CREDENTIAL_GENERATION_VALIDATION", CredentialType.PERMANENT, null, null).getResponseObject();
+        assertNotNull(r1.getUsername());
+        String credentialValue = r1.getCredentialValue();
+        assertEquals(12, credentialValue.length());
+        final String defaultSpecialChars = "^<>{};:.,~!?@#$%=&*[]()";
+        long specialCount = credentialValue.chars().filter(c -> defaultSpecialChars.indexOf(c) >= 0).count();
+        assertEquals(1, specialCount);
+    }
+
+    @Test
     void testValidateCredential1() throws NextStepClientException {
         String name = UUID.randomUUID().toString();
         CredentialValidationParam credentialValParam = new CredentialValidationParam();

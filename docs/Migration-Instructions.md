@@ -3,6 +3,12 @@
 This page contains PowerAuth Next Step migration instructions.
 
 - [PowerAuth Next Step 2.2.0](./Next-Step-2.2.0.md)
+
+## Unreleased
+
+### Configuration Change: `CredentialGenerationParam.specialChars`
+
+A new optional field `specialChars` has been added to `CredentialGenerationParam`. When `includeSpecialChars` is `true` and `specialChars` is not set (or `null`), the default set `^<>{};:.,~!?@#$%=&*[]()` is used — matching the previous hardcoded behavior. No action is required for existing deployments unless you wish to customize the set of special characters.
 - [PowerAuth Next Step 2.0.0](./Next-Step-2.0.0.md)
 - [PowerAuth Next Step 1.10.0](./Next-Step-1.10.0.md)
 - [PowerAuth Next Step 1.9.0](./Next-Step-1.9.0.md)
