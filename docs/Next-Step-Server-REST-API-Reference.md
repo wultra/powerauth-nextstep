@@ -4293,6 +4293,47 @@ The list of expected status codes:
 }
 ```
 
+
+The `credentialGenParam.specialChars` field is optional. When `includeSpecialChars` is `true`:
+- If `specialChars` is provided (e.g. `"!@#$%"`), only the characters in that string are used as special characters during password generation. The maximum length is 256 characters.
+- If `specialChars` is `null` or omitted, the default character set `^<>{};:.,~!?@#$%=&*[]()` is used.
+
+Example request using a custom set of special characters:
+
+```json
+{
+  "requestObject": {
+    "credentialPolicyName": "TEST_CREDENTIAL_POLICY_CUSTOM_SPECIAL",
+    "description": "Test policy with custom special characters",
+    "usernameLengthMin": 8,
+    "usernameLengthMax": 32,
+    "credentialLengthMin": 8,
+    "credentialLengthMax": 32,
+    "limitSoft": 3,
+    "limitHard": 5,
+    "checkHistoryCount": 3,
+    "rotationEnabled": false,
+    "usernameGenAlgorithm": "RANDOM_DIGITS",
+    "usernameGenParam": {
+      "length": 8
+    },
+    "credentialGenAlgorithm": "RANDOM_PASSWORD",
+    "credentialGenParam": {
+      "length": 12,
+      "includeSmallLetters": true,
+      "smallLettersCount": 5,
+      "includeCapitalLetters": true,
+      "capitalLettersCount": 5,
+      "includeDigits": true,
+      "digitsCount": 1,
+      "includeSpecialChars": true,
+      "specialCharsCount": 1,
+      "specialChars": "!@#$%"
+    }
+  }
+}
+```
+
 #### Response 200
 
 - Headers:
@@ -4453,7 +4494,7 @@ The list of expected status codes:
           "digitsCount": null,
           "includeSpecialChars": true,
           "specialCharsCount": null,
-      "specialChars": null
+          "specialChars": null
         },
         "credentialValParam": {
           "includeWhitespaceRule": true,
