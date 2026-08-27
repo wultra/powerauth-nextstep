@@ -19,7 +19,6 @@ package com.wultra.security.powerauth.lib.nextstep.model.entity;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
@@ -46,7 +45,5 @@ public class CredentialGenerationParam {
     private boolean includeSpecialChars;
     @Positive
     private Integer specialCharsCount;
-    @Size(max = 256)
-    private String specialChars;
 
 }
