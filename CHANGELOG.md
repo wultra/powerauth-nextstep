@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the `javascript` language from the CodeQL analysis workflow, as the repository contains no JS/TS source [(#60)](https://github.com/wultra/powerauth-nextstep/issues/60)
 
+## [2.2.2] - 2026-08-27
+
+### Added
+
+- Added `specialChars` configuration parameter to `CredentialGenerationParam` to allow customizing the set of special characters used during password generation [(#68)](https://github.com/wultra/powerauth-nextstep/issues/68)
+
 ## [2.2.1] - 2026-08-12
 
 ### Fixed
@@ -28,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded Docker base image to `ibm-semeru-runtimes:open-jdk-25.0.3.0-jre-noble` (OpenJDK 25) [(#46)](https://github.com/wultra/powerauth-nextstep/issues/46)
 - Migrated to Spring Boot 4 and Jackson 3 [(#37)](https://github.com/wultra/powerauth-nextstep/issues/37)
 
-[unreleased]: https://github.com/wultra/powerauth-nextstep/compare/2.2.1...HEAD
+[unreleased]: https://github.com/wultra/powerauth-nextstep/compare/2.2.2...HEAD
+[2.2.2]: https://github.com/wultra/powerauth-nextstep/compare/2.2.1...2.2.2
 [2.2.1]: https://github.com/wultra/powerauth-nextstep/compare/2.2.0...2.2.1
 [2.2.0]: https://github.com/wultra/powerauth-nextstep/compare/2.0.0...2.2.0
