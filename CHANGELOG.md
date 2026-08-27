@@ -5,17 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-## 2.2.1 - 2026-08-11
+## [Unreleased]
 
 ### Changed
 
-- Updated wultra-core dependency to 2.2.1 with fix for date serialization in `DefaultRestClient`; Jackson 3 changed the `WRITE_DATES_AS_TIMESTAMPS` default to `false`, which broke clients that parse the timestamps as numbers [(wultra-core#475)](https://github.com/wultra/java-core/issues/475)
+- Changed Docker images to be based on the Wultra base image [(#63)](https://github.com/wultra/powerauth-nextstep/issues/63)
 
-## 2.2.0 - 2026-07-23
+### Fixed
+
+- Removed the `javascript` language from the CodeQL analysis workflow, as the repository contains no JS/TS source [(#60)](https://github.com/wultra/powerauth-nextstep/issues/60)
+
+## [2.2.2] - 2026-08-27
+
+### Added
+
+- Added `specialChars` configuration parameter to `CredentialGenerationParam` to allow customizing the set of special characters used during password generation [(#68)](https://github.com/wultra/powerauth-nextstep/issues/68)
+
+## [2.2.1] - 2026-08-12
+
+### Fixed
+
+- Updated `wultra-core` to 2.2.1 to fix date serialization compatibility with Jackson 3 [(#54)](https://github.com/wultra/powerauth-nextstep/issues/54)
+
+## [2.2.0] - 2026-07-23
 
 ### Changed
 
-- Upgraded Docker base image to `ibm-semeru-runtimes:open-jdk-25.0.3.0-jre-noble` (OpenJDK 25) [(2090)](https://github.com/wultra/powerauth-webflow/issues/2090)
-- Migrated to Spring Boot 4 and Jackson 3 [(2088)](https://github.com/wultra/powerauth-webflow/issues/2088)
+- Upgraded Docker base image to `ibm-semeru-runtimes:open-jdk-25.0.3.0-jre-noble` (OpenJDK 25) [(#46)](https://github.com/wultra/powerauth-nextstep/issues/46)
+- Migrated to Spring Boot 4 and Jackson 3 [(#37)](https://github.com/wultra/powerauth-nextstep/issues/37)
+
+[unreleased]: https://github.com/wultra/powerauth-nextstep/compare/2.2.2...HEAD
+[2.2.2]: https://github.com/wultra/powerauth-nextstep/compare/2.2.1...2.2.2
+[2.2.1]: https://github.com/wultra/powerauth-nextstep/compare/2.2.0...2.2.1
+[2.2.0]: https://github.com/wultra/powerauth-nextstep/compare/2.0.0...2.2.0
