@@ -27,6 +27,7 @@ import com.wultra.security.powerauth.lib.nextstep.model.enumeration.CredentialGe
 import com.wultra.security.powerauth.lib.nextstep.model.enumeration.UsernameGenerationAlgorithm;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.CredentialValidationFailedException;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateCredentialPolicyRequest;
+import com.wultra.security.powerauth.lib.nextstep.model.request.CreateCredentialRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateUserRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateCredentialDefinitionRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateCredentialPolicyRequest;
@@ -115,7 +116,11 @@ class NextStepCredentialTest extends NextStepTest {
         credentialGenParam.setSpecialCharsCount(1);
         credentialGenParam.setSpecialChars("!@#");
         updateCredentialDefinition(name, credentialGenParam, null);
-        CreateCredentialResponse r1 = nextStepClient.createCredential("test_user_1", "TEST_CREDENTIAL_GENERATION_VALIDATION", CredentialType.PERMANENT, null, null).getResponseObject();
+        final CreateCredentialRequest request1 = new CreateCredentialRequest();
+        request1.setUserId("test_user_1");
+        request1.setCredentialName("TEST_CREDENTIAL_GENERATION_VALIDATION");
+        request1.setCredentialType(CredentialType.PERMANENT);
+        CreateCredentialResponse r1 = nextStepClient.createCredential(request1).getResponseObject();
         assertNotNull(r1.getUsername());
         String credentialValue = r1.getCredentialValue();
         assertEquals(12, credentialValue.length());
@@ -138,7 +143,11 @@ class NextStepCredentialTest extends NextStepTest {
         credentialGenParam.setSpecialCharsCount(1);
         // No specialChars set - should use default set
         updateCredentialDefinition(name, credentialGenParam, null);
-        CreateCredentialResponse r1 = nextStepClient.createCredential("test_user_1", "TEST_CREDENTIAL_GENERATION_VALIDATION", CredentialType.PERMANENT, null, null).getResponseObject();
+        final CreateCredentialRequest request2 = new CreateCredentialRequest();
+        request2.setUserId("test_user_1");
+        request2.setCredentialName("TEST_CREDENTIAL_GENERATION_VALIDATION");
+        request2.setCredentialType(CredentialType.PERMANENT);
+        CreateCredentialResponse r1 = nextStepClient.createCredential(request2).getResponseObject();
         assertNotNull(r1.getUsername());
         String credentialValue = r1.getCredentialValue();
         assertEquals(12, credentialValue.length());

@@ -271,8 +271,8 @@ public class CredentialGenerationService {
         if (includeSpecialChars) {
             final String specialChars = param.getSpecialChars();
             final CharacterData specialCharacterData = (specialChars != null && !specialChars.isEmpty())
-                    ? new CustomSpecialCharacters(specialChars)
-                    : new SpecialCharacters();
+                    ? new SpecialCharacters(specialChars)
+                    : new SpecialCharacters(SpecialCharacters.DEFAULT_CHARACTERS);
             final CharacterRule rule;
             if (specialCharsCount == null) {
                 rule = new CharacterRule(specialCharacterData);
@@ -304,29 +304,12 @@ public class CredentialGenerationService {
     }
 
     /**
-     * Custom character data definition for special characters.
+     * Character data definition for special characters.
+     * Use {@link #DEFAULT_CHARACTERS} when no custom set is configured.
      */
-    private static class SpecialCharacters implements CharacterData {
+    private record SpecialCharacters(String characters) implements CharacterData {
 
-        private static final String ERROR_CODE = "INSUFFICIENT_SPECIAL_CHARACTERS";
-        private static final String CHARACTERS = "^<>{};:.,~!?@#$%=&*[]()";
-
-        @Override
-        public String getErrorCode() {
-            return ERROR_CODE;
-        }
-
-        @Override
-        public String getCharacters() {
-            return CHARACTERS;
-        }
-    }
-
-    /**
-     * Custom character data definition for a user-configured set of special characters.
-     */
-    private record CustomSpecialCharacters(String characters) implements CharacterData {
-
+        static final String DEFAULT_CHARACTERS = "^<>{};:.,~!?@#$%=&*[]()";
         private static final String ERROR_CODE = "INSUFFICIENT_SPECIAL_CHARACTERS";
 
         @Override
