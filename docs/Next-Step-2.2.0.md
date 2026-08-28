@@ -8,6 +8,14 @@ This guide contains instructions for migration from PowerAuth Next Step version 
 
 Similar to a credential update, the NextStep API endpoint `POST /credential/reset` resets credentials with source `LDAP` or `PROXY` and target `LOCAL`. The stored credential source is then updated to `LOCAL`.
 
+### Configurable Special Characters in Password Generation (since 2.2.2)
+
+The `credentialGenParam` object in credential policy requests now supports an optional `specialChars` field (string, max 256 characters). When `includeSpecialChars` is `true`:
+- If `specialChars` is provided, only the characters in that string are used as special characters during password generation.
+- If `specialChars` is `null` or omitted, the default character set `^<>{};:.,~!?@#$%=&*[]()` is used — matching the previous behavior.
+
+No database migration is required. Existing credential policies without `specialChars` continue to use the default character set.
+
 ## Database Changes
 
 For convenience, you can use liquibase for your database migration.
