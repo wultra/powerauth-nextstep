@@ -7,12 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added verification tracking (`verificationMethod`, `timestampVerified`) to user contacts [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
+- Added an OTP/deeplink contact verification flow (`POST /user/contact/verification/start` and `/confirm`) [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
+
 ### Changed
 
 - Changed Docker images to be based on the Wultra base image [(#63)](https://github.com/wultra/powerauth-nextstep/issues/63)
 
 ### Fixed
 
+- Rejected executable schemes in verification deeplinks and returned failed confirmation for missing users or contacts [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
 - Removed the `javascript` language from the CodeQL analysis workflow, as the repository contains no JS/TS source [(#60)](https://github.com/wultra/powerauth-nextstep/issues/60)
 
 ## [2.2.2] - 2026-08-27

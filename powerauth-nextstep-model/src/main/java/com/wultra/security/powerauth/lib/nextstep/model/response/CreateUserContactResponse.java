@@ -18,10 +18,13 @@
 package com.wultra.security.powerauth.lib.nextstep.model.response;
 
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+
+import java.util.Date;
 
 /**
  * Response object used for creating a user contact.
@@ -44,5 +47,13 @@ public class CreateUserContactResponse {
     private String contactValue;
     @NotNull
     private boolean primary;
+    /**
+     * Method used to verify the contact. A {@code null} value means the contact is unverified.
+     */
+    private ContactVerificationMethod verificationMethod;
+    /**
+     * Timestamp when the contact was verified, or {@code null} if the contact is unverified.
+     */
+    private Date timestampVerified;
 
 }

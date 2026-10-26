@@ -301,7 +301,10 @@ public class AuthenticationService {
     }
 
     /**
-     * Authenticate with OTP.
+     * Authenticate with OTP via the generic OTP authentication endpoint.
+     *
+     * <p>Contact-verification OTPs must not be confirmed here; they are rejected and must be confirmed via the
+     * contact verification endpoint.</p>
      *
      * @param request Authentication with OTP request.
      * @return Authentication with OTP response.
@@ -319,6 +322,34 @@ public class AuthenticationService {
      */
     @Transactional
     public OtpAuthenticationResponse authenticateWithOtp(OtpAuthenticationRequest request) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException, CredentialNotFoundException, OperationAlreadyCanceledException, OperationAlreadyFinishedException, InvalidConfigurationException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
+        final OtpEntity otp = serviceCatalogue.getOtpService().findOtp(request.getOtpId(), request.getOperationId());
+        if (otp.getVerificationMethod() != null) {
+            throw new InvalidRequestException("Contact verification OTP must be confirmed via the contact verification endpoint, OTP ID: " + otp.getOtpId());
+        }
+        return authenticateWithOtpInternal(request);
+    }
+
+    /**
+     * Authenticate with OTP without the generic-endpoint contact-verification guard.
+     *
+     * <p>Used by the contact verification confirm flow; callers must already hold the per-user lock.</p>
+     *
+     * @param request Authentication with OTP request.
+     * @return Authentication with OTP response.
+     * @throws OtpNotFoundException Thrown when OTP is not found.
+     * @throws OperationNotFoundException Thrown when operation is not found.
+     * @throws InvalidRequestException Thrown when request is invalid.
+     * @throws CredentialNotFoundException Thrown when credential is not found.
+     * @throws OperationAlreadyCanceledException Thrown when operation is already canceled.
+     * @throws OperationAlreadyFinishedException Thrown when operation is already finished.
+     * @throws OperationAlreadyFailedException Thrown when operation is already failed.
+     * @throws OperationNotValidException Thrown when operation is not valid.
+     * @throws InvalidConfigurationException Thrown when Next Step configuration is invalid.
+     * @throws AuthMethodNotFoundException Thrown when authentication method is not found.
+     * @throws EncryptionException Thrown when decryption fails.
+     */
+    @Transactional
+    public OtpAuthenticationResponse authenticateWithOtpInternal(OtpAuthenticationRequest request) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException, CredentialNotFoundException, OperationAlreadyCanceledException, OperationAlreadyFinishedException, InvalidConfigurationException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
         final OtpService otpService = serviceCatalogue.getOtpService();
         final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
         final OperationPersistenceService operationPersistenceService = serviceCatalogue.getOperationPersistenceService();

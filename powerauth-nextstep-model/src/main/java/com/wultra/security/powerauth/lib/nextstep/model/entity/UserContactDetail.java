@@ -18,6 +18,7 @@
 package com.wultra.security.powerauth.lib.nextstep.model.entity;
 
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -48,5 +49,13 @@ public class UserContactDetail {
     @NotNull
     private Date timestampCreated;
     private Date timestampLastUpdated;
+    /**
+     * Method used to verify the contact. A {@code null} value means the contact is unverified.
+     */
+    private ContactVerificationMethod verificationMethod;
+    /**
+     * Timestamp when the contact was verified, or {@code null} if the contact is unverified.
+     */
+    private Date timestampVerified;
 
 }

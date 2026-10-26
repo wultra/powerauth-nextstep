@@ -102,7 +102,7 @@ public class UserIdentityService {
         final EndToEndEncryptionService endToEndEncryptionService = serviceCatalogue.getEndToEndEncryptionService();
         final CredentialService credentialService = serviceCatalogue.getCredentialService();
 
-        final Optional<UserIdentityEntity> userOptional = userIdentityRepository.findById(request.getUserId());
+        final Optional<UserIdentityEntity> userOptional = userIdentityRepository.findAndLockByUserId(request.getUserId());
         UserIdentityEntity user;
         Map<String, RoleEntity> roleEntities = new HashMap<>();
         if (request.getRoles() != null) {
@@ -233,7 +233,7 @@ public class UserIdentityService {
         final EndToEndEncryptionService endToEndEncryptionService = serviceCatalogue.getEndToEndEncryptionService();
         final CredentialService credentialService = serviceCatalogue.getCredentialService();
 
-        UserIdentityEntity user = userIdentityRepository.findById(request.getUserId()).orElseThrow(() ->
+        UserIdentityEntity user = userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
                 new UserNotFoundException("User identity not found: " + request.getUserId()));
         // The findUser() method is not used to allow update REMOVED -> ACTIVE
         Map<String, RoleEntity> roleEntities = new HashMap<>();
@@ -443,6 +443,8 @@ public class UserIdentityService {
      */
     @Transactional
     public DeleteUserResponse deleteUser(DeleteUserRequest request) throws UserNotFoundException {
+        // Take the per-user lock first, consistently with contact verification, to avoid deadlocks
+        userIdentityRepository.findAndLockByUserId(request.getUserId());
         final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
         UserIdentityEntity user = userIdentityLookupService.findUser(request.getUserId());
         user.setStatus(UserIdentityStatus.REMOVED);
@@ -626,6 +628,12 @@ public class UserIdentityService {
             } else {
                 userContact.setTimestampLastUpdated(new Date());
             }
+            if (userContact.getValue() != null && (!userContact.getValue().equals(contactToAdd.getContactValue()) || userContact.getType() != contactToAdd.getContactType())) {
+                // A changed contact is no longer verified and its pending verifications are invalidated
+                serviceCatalogue.getContactVerificationService().invalidatePendingVerifications(userContact);
+                userContact.setVerificationMethod(null);
+                userContact.setTimestampVerified(null);
+            }
             userContact.setType(contactToAdd.getContactType());
             userContact.setValue(contactToAdd.getContactValue());
             userContact.setPrimary(contactToAdd.isPrimary());
@@ -636,11 +644,14 @@ public class UserIdentityService {
             contactDetail.setPrimary(userContact.isPrimary());
             contactDetail.setTimestampCreated(userContact.getTimestampCreated());
             contactDetail.setTimestampLastUpdated(userContact.getTimestampLastUpdated());
+            contactDetail.setVerificationMethod(userContact.getVerificationMethod());
+            contactDetail.setTimestampVerified(userContact.getTimestampVerified());
             contactListResponse.add(contactDetail);
         }
         // Remove obsolete contacts
         existingContactMap.forEach((contactName, contactEntity) -> {
             if (contacts.stream().noneMatch(c -> c.getContactName().equals(contactName))) {
+                serviceCatalogue.getContactVerificationService().invalidatePendingVerifications(contactEntity);
                 user.getContacts().remove(contactEntity);
             }
         });

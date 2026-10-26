@@ -69,4 +69,12 @@ public interface OtpRepository extends CrudRepository<OtpEntity, String> {
      */
     Stream<OtpEntity> findAllByOperationAndStatus(OperationEntity operationEntity, OtpStatus status);
 
+    /**
+     * Find OTP entities by user identity and status.
+     * @param userId User identity identifier.
+     * @param status OTP status.
+     * @return Stream of OTP entities.
+     */
+    Stream<OtpEntity> findAllByUserIdAndStatus(String userId, OtpStatus status);
+
 }

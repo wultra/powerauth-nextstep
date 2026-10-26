@@ -2,6 +2,7 @@
 
 This page contains PowerAuth Next Step migration instructions.
 
+- [PowerAuth Next Step 2.3.0](./Next-Step-2.3.0.md)
 - [PowerAuth Next Step 2.2.0](./Next-Step-2.2.0.md)
 - [PowerAuth Next Step 2.0.0](./Next-Step-2.0.0.md)
 - [PowerAuth Next Step 1.10.0](./Next-Step-1.10.0.md)

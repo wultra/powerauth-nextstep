@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <changeSet id="1" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="ns_user_contact" columnName="verification_method"/>
+            </not>
+        </preConditions>
+        <comment>Add column verification_method to ns_user_contact</comment>
+        <addColumn tableName="ns_user_contact">
+            <column name="verification_method" type="varchar(32)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="ns_user_contact" columnName="verification_method"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="2" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="ns_user_contact" columnName="timestamp_verified"/>
+            </not>
+        </preConditions>
+        <comment>Add column timestamp_verified to ns_user_contact</comment>
+        <addColumn tableName="ns_user_contact">
+            <column name="timestamp_verified" type="timestamp"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="ns_user_contact" columnName="timestamp_verified"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="3" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="ns_otp_storage" columnName="verification_method"/>
+            </not>
+        </preConditions>
+        <comment>Add column verification_method to ns_otp_storage to persist the contact verification method started for an OTP</comment>
+        <addColumn tableName="ns_otp_storage">
+            <column name="verification_method" type="varchar(32)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="ns_otp_storage" columnName="verification_method"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
