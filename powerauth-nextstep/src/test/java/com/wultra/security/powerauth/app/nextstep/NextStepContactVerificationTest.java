@@ -41,9 +41,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -539,6 +546,104 @@ class NextStepContactVerificationTest extends NextStepTest {
         final NextStepClientException thrown = assertThrows(NextStepClientException.class,
                 () -> nextStepClient.authenticateWithOtp(start.getVerificationId(), start.getOtpValue()));
         assertEquals(InvalidRequestException.CODE, thrown.getError().getCode());
+    }
+
+    @Test
+    void concurrentConfirmsWithCorrectOtpVerifyExactlyOnce() throws Exception {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = startOtp(userId);
+
+        // Two correct confirmations racing on the same OTP: the per-user lock must serialize them so the OTP is
+        // consumed exactly once - otherwise both could observe the ACTIVE OTP and both succeed.
+        final List<ConfirmContactVerificationResponse> results = runConcurrently(2,
+                () -> confirm(userId, CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null));
+
+        final long verified = results.stream().filter(r -> r != null && r.isVerified()).count();
+        assertEquals(1, verified);
+        assertEquals(ContactVerificationMethod.OTP, singleContact(userId).getVerificationMethod());
+    }
+
+    @Test
+    void concurrentWrongConfirmsNeverExceedAttemptLimit() throws Exception {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = startOtp(userId);
+
+        // Five wrong confirmations race under attempt limit 3. With the per-user lock the failed attempts cannot be
+        // lost, so the limit is reached and the OTP is invalidated; the correct value must then no longer verify.
+        runConcurrently(5, () -> confirm(userId, CONTACT_NAME, start.getVerificationId(), "00000000", null));
+
+        assertFalse(confirm(userId, CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null).isVerified());
+        assertNull(singleContact(userId).getVerificationMethod());
+    }
+
+    @Test
+    void concurrentStartsLeaveExactlyOneActiveOtp() throws Exception {
+        final String userId = createUserWithContact("user@test.test");
+
+        // Two starts race. The per-user lock must serialize the remove-then-create sequence so only one OTP remains
+        // ACTIVE; without it both could create an OTP, leaving two independently confirmable credentials.
+        final List<StartContactVerificationResponse> starts = runConcurrently(2, () -> startOtp(userId));
+
+        long active = 0;
+        for (StartContactVerificationResponse s : starts) {
+            if (s != null && nextStepClient.getOtpDetail(s.getVerificationId(), null)
+                    .getResponseObject().getOtpDetail().getOtpStatus() == OtpStatus.ACTIVE) {
+                active++;
+            }
+        }
+        assertEquals(1, active);
+    }
+
+    @Test
+    void concurrentContactValueChangeVsConfirmNeverVerifiesStaleValue() throws Exception {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = startOtp(userId);
+
+        // A value change and a confirmation of the OTP bound to the old value race. The per-user lock serializes them,
+        // and in either order the contact must not end up verified against the old value: if the change wins, the
+        // confirmation sees a binding mismatch; if the confirmation wins, the subsequent change resets the verification.
+        final List<Callable<Object>> tasks = List.of(
+                () -> nextStepClient.updateUserContact(userId, CONTACT_NAME, CONTACT_TYPE, "changed@test.test", true),
+                () -> confirm(userId, CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null));
+        runConcurrently(tasks);
+
+        final UserContactDetail contact = singleContact(userId);
+        assertEquals("changed@test.test", contact.getContactValue());
+        assertNull(contact.getVerificationMethod());
+    }
+
+    private <T> List<T> runConcurrently(final int threads, final Callable<T> task) throws InterruptedException {
+        final List<Callable<T>> tasks = new ArrayList<>();
+        for (int i = 0; i < threads; i++) {
+            tasks.add(task);
+        }
+        return runConcurrently(tasks);
+    }
+
+    private <T> List<T> runConcurrently(final List<Callable<T>> tasks) throws InterruptedException {
+        final CyclicBarrier barrier = new CyclicBarrier(tasks.size());
+        final ExecutorService pool = Executors.newFixedThreadPool(tasks.size());
+        try {
+            final List<Callable<T>> wrapped = new ArrayList<>();
+            for (final Callable<T> task : tasks) {
+                // Release all threads from the barrier together so the calls actually overlap, without any sleeps.
+                wrapped.add(() -> {
+                    barrier.await();
+                    return task.call();
+                });
+            }
+            final List<T> results = new ArrayList<>();
+            for (final Future<T> future : pool.invokeAll(wrapped)) {
+                try {
+                    results.add(future.get());
+                } catch (ExecutionException ex) {
+                    results.add(null);
+                }
+            }
+            return results;
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     private StartContactVerificationResponse startOtp(final String userId) throws NextStepClientException {
