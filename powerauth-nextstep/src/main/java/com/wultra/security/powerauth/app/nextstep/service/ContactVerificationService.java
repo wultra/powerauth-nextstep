@@ -21,6 +21,7 @@ import com.wultra.core.audit.base.Audit;
 import com.wultra.core.audit.base.model.AuditDetail;
 import com.wultra.security.powerauth.app.nextstep.configuration.ContactVerificationConfiguration;
 import com.wultra.security.powerauth.app.nextstep.repository.OtpRepository;
+import com.wultra.security.powerauth.app.nextstep.repository.UserIdentityRepository;
 import com.wultra.security.powerauth.app.nextstep.repository.catalogue.RepositoryCatalogue;
 import com.wultra.security.powerauth.app.nextstep.repository.model.entity.OtpDefinitionEntity;
 import com.wultra.security.powerauth.app.nextstep.repository.model.entity.OtpEntity;
@@ -73,6 +74,7 @@ public class ContactVerificationService {
 
     private final ServiceCatalogue serviceCatalogue;
     private final OtpRepository otpRepository;
+    private final UserIdentityRepository userIdentityRepository;
     private final Audit audit;
     private final ContactVerificationConfiguration configuration;
 
@@ -87,6 +89,7 @@ public class ContactVerificationService {
     public ContactVerificationService(RepositoryCatalogue repositoryCatalogue, @Lazy ServiceCatalogue serviceCatalogue, Audit audit, ContactVerificationConfiguration configuration) {
         this.serviceCatalogue = serviceCatalogue;
         this.otpRepository = repositoryCatalogue.getOtpRepository();
+        this.userIdentityRepository = repositoryCatalogue.getUserIdentityRepository();
         this.audit = audit;
         this.configuration = configuration;
     }
@@ -112,7 +115,7 @@ public class ContactVerificationService {
      * @throws OtpNotFoundException Thrown when the created OTP cannot be read back.
      * @throws EncryptionException Thrown when encryption or decryption fails.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public StartContactVerificationResponse startContactVerification(StartContactVerificationRequest request) throws UserNotFoundException, UserContactNotFoundException,
             InvalidRequestException, InvalidConfigurationException, OtpDefinitionNotFoundException, UserNotActiveException, CredentialDefinitionNotFoundException,
             OperationNotFoundException, OtpGenAlgorithmNotSupportedException, OperationAlreadyFinishedException, OperationAlreadyFailedException,
@@ -121,6 +124,11 @@ public class ContactVerificationService {
         if (method != ContactVerificationMethod.OTP && method != ContactVerificationMethod.DEEPLINK) {
             throw new InvalidRequestException("Only OTP or DEEPLINK contact verification may be started, method: " + method);
         }
+
+        // Acquire a pessimistic write lock on the user identity to serialize concurrent start/confirm and contact-value
+        // updates for the same user, so OTP issuance cannot interleave with a confirmation or a contact value change.
+        userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
+                new UserNotFoundException("User identity not found: " + request.getUserId()));
 
         final UserContactEntity contact = findContact(request.getUserId(), request.getContactName(), request.getContactType());
         final String bindingHash = computeBindingHash(contact.getName(), contact.getType(), contact.getValue());
@@ -136,11 +144,21 @@ public class ContactVerificationService {
         if (otpDefinition.getOtpPolicy().getAttemptLimit() == null) {
             throw new InvalidConfigurationException("Contact verification OTP definition must define an attempt limit, definition: " + request.getOtpDefinitionName());
         }
+        // Guard: a finite expiration is required, otherwise an unexpiring verification OTP would remain valid indefinitely.
+        if (otpDefinition.getOtpPolicy().getExpirationTime() == null) {
+            throw new InvalidConfigurationException("Contact verification OTP definition must define an expiration time, definition: " + request.getOtpDefinitionName());
+        }
+        // Guard: the data adapter proxy branch has no operation in this local, operation-less flow and would dereference
+        // a null operation (NPE) at confirmation, so proxy-enabled definitions are rejected up front.
+        if (otpDefinition.isDataAdapterProxyEnabled()) {
+            throw new InvalidConfigurationException("Contact verification OTP definition must not be data adapter proxy enabled, definition: " + request.getOtpDefinitionName());
+        }
 
         // Build the deeplink URL eagerly for the DEEPLINK method so that an invalid base URL fails before any OTP is issued.
         final boolean deeplink = method == ContactVerificationMethod.DEEPLINK;
         if (deeplink) {
             validateDeeplinkConfiguration(request.getDeeplinkBaseUrl());
+            validateMessageTemplate(request.getMessageTemplate());
         }
 
         // Ensure a single active verification per (user, contact) by removing earlier active OTPs for the same binding.
@@ -203,7 +221,17 @@ public class ContactVerificationService {
     public ConfirmContactVerificationResponse confirmContactVerification(ConfirmContactVerificationRequest request) throws UserNotFoundException, UserContactNotFoundException,
             InvalidRequestException, InvalidConfigurationException, OperationNotFoundException, CredentialNotFoundException, OperationAlreadyCanceledException,
             OperationAlreadyFinishedException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
-        final UserContactEntity contact = findContact(request.getUserId(), request.getContactName(), request.getContactType());
+        final UserContactEntity contact;
+        try {
+            // Acquire a pessimistic write lock on the user identity first, serializing concurrent confirmations and
+            // contact-value updates for the same user so attempt counters cannot be lost and two confirms cannot both succeed.
+            userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
+                    new UserNotFoundException("User identity not found: " + request.getUserId()));
+            contact = findContact(request.getUserId(), request.getContactName(), request.getContactType());
+        } catch (UserNotFoundException | UserContactNotFoundException ex) {
+            // Do not reveal whether the user or contact exists; an unknown user/contact fails generically, exactly like a wrong OTP.
+            return failed(null);
+        }
         final String otpId = request.getVerificationId();
 
         final OtpEntity otp;
@@ -214,6 +242,7 @@ public class ContactVerificationService {
         }
 
         // Bind the OTP to the current user and contact value; any mismatch results in a generic failure without revealing the cause.
+        // This re-check runs under the pessimistic user lock, so a stale contact value cannot overwrite a newer one.
         final String bindingHash = computeBindingHash(contact.getName(), contact.getType(), contact.getValue());
         if (!request.getUserId().equals(otp.getUserId()) || !bindingHash.equals(otp.getOtpData())) {
             return failed(null);
@@ -311,6 +340,24 @@ public class ContactVerificationService {
     }
 
     /**
+     * Invalidate any pending (ACTIVE) contact-verification OTPs bound to a previous contact value. Because the OTP
+     * binding hash is value-specific, removing OTPs bound to the old value on every change prevents a later change back
+     * to the old value from reviving a stale verification. Intended to be called under the per-user pessimistic lock.
+     * @param userId User identity identifier.
+     * @param contactName Contact name.
+     * @param contactType Contact type.
+     * @param oldValue Previous contact value whose pending verifications should be invalidated.
+     * @throws OtpNotFoundException Thrown when an OTP cannot be read back.
+     * @throws OperationNotFoundException Thrown when an operation is not found.
+     * @throws InvalidRequestException Thrown when the request is invalid.
+     */
+    public void invalidatePendingContactVerifications(String userId, String contactName, ContactType contactType, String oldValue)
+            throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException {
+        final String bindingHash = computeBindingHash(contactName, contactType, oldValue);
+        removeActiveVerifications(userId, bindingHash);
+    }
+
+    /**
      * Remove earlier active verification OTPs for the same user and binding.
      */
     private void removeActiveVerifications(String userId, String bindingHash) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException {
@@ -340,10 +387,16 @@ public class ContactVerificationService {
     }
 
     /**
-     * Compute a SHA-256 hex binding hash of the contact name, type and value. The value itself is never logged or persisted.
+     * Compute a SHA-256 hex binding hash of the contact name, type and value. The serialized input is injective:
+     * each field is prefixed with its UTF-8 byte length so that field boundaries are unambiguous and distinct inputs
+     * cannot collide, i.e. {@code len(name):name:len(type):type:len(value):value}. The value is never logged or persisted.
      */
     private String computeBindingHash(String contactName, ContactType contactType, String contactValue) {
-        final String input = contactName + '|' + contactType.name() + '|' + contactValue;
+        final byte[] nameBytes = contactName.getBytes(StandardCharsets.UTF_8);
+        final String typeName = contactType.name();
+        final byte[] typeBytes = typeName.getBytes(StandardCharsets.UTF_8);
+        final byte[] valueBytes = contactValue.getBytes(StandardCharsets.UTF_8);
+        final String input = nameBytes.length + ":" + contactName + ":" + typeBytes.length + ":" + typeName + ":" + valueBytes.length + ":" + contactValue;
         try {
             final MessageDigest digest = MessageDigest.getInstance("SHA-256");
             final byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
@@ -366,6 +419,16 @@ public class ContactVerificationService {
             throw new InvalidRequestException("Deeplink base URL is required for the DEEPLINK method");
         }
         validateDeeplinkUrl(baseUrl);
+    }
+
+    /**
+     * Validate the optional caller-supplied message template. When present, it must contain the {@code {token}}
+     * placeholder, otherwise the built deeplink would carry no token and the resulting verification could never be confirmed.
+     */
+    private void validateMessageTemplate(String messageTemplate) throws InvalidRequestException {
+        if (messageTemplate != null && !messageTemplate.contains("{token}")) {
+            throw new InvalidRequestException("Deeplink message template must contain the {token} placeholder");
+        }
     }
 
     /**
@@ -406,8 +469,13 @@ public class ContactVerificationService {
         if (messageTemplate != null) {
             finalUrl = messageTemplate.replace("{token}", otpValue);
         } else {
-            final String separator = baseUrl.contains("?") ? "&" : "?";
-            finalUrl = baseUrl + separator + "token=" + otpValue;
+            // Insert the token query parameter before any URL fragment so a fragment is not corrupted
+            // (e.g. https://ex.com/verify#frag must become https://ex.com/verify?token=...#frag).
+            final int fragmentIndex = baseUrl.indexOf('#');
+            final String beforeFragment = fragmentIndex >= 0 ? baseUrl.substring(0, fragmentIndex) : baseUrl;
+            final String fragment = fragmentIndex >= 0 ? baseUrl.substring(fragmentIndex) : "";
+            final String separator = beforeFragment.contains("?") ? "&" : "?";
+            finalUrl = beforeFragment + separator + "token=" + otpValue + fragment;
         }
         // Validate the final URL too, so a messageTemplate cannot bypass the scheme/host guards (finding #2).
         validateDeeplinkUrl(finalUrl);

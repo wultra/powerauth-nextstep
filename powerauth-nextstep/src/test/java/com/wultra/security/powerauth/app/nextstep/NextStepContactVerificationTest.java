@@ -17,12 +17,14 @@
  */
 package com.wultra.security.powerauth.app.nextstep;
 
+import com.wultra.security.powerauth.app.nextstep.configuration.ContactVerificationConfiguration;
 import com.wultra.security.powerauth.lib.nextstep.client.NextStepClientException;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.OtpGenerationParam;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.UserContactDetail;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
 import com.wultra.security.powerauth.lib.nextstep.model.enumeration.OtpGenerationAlgorithm;
+import com.wultra.security.powerauth.lib.nextstep.model.exception.InvalidConfigurationException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.InvalidRequestException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserContactNotFoundException;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpDefinitionRequest;
@@ -32,8 +34,10 @@ import com.wultra.security.powerauth.lib.nextstep.model.response.ConfirmContactV
 import com.wultra.security.powerauth.lib.nextstep.model.response.StartContactVerificationResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -46,14 +50,25 @@ import static org.junit.jupiter.api.Assertions.*;
 class NextStepContactVerificationTest extends NextStepTest {
 
     private static final String OTP_DEFINITION = "CONTACT_VERIFICATION_OTP";
+    private static final String DIGEST_OTP_DEFINITION = "TEST_OTP";
+    private static final String NO_LIMIT_OTP_DEFINITION = "CONTACT_VERIFICATION_NO_LIMIT_OTP";
+    private static final String NO_EXPIRY_OTP_DEFINITION = "CONTACT_VERIFICATION_NO_EXPIRY_OTP";
+    private static final String PROXY_OTP_DEFINITION = "CONTACT_VERIFICATION_PROXY_OTP";
+    private static final String EXPIRING_OTP_DEFINITION = "CONTACT_VERIFICATION_EXPIRING_OTP";
     private static final String CONTACT_NAME = "TEST_CONTACT";
     private static final ContactType CONTACT_TYPE = ContactType.EMAIL;
+
+    @Autowired
+    private ContactVerificationConfiguration contactVerificationConfiguration;
 
     @BeforeEach
     void setUp() throws Exception {
         nextStepClient = nextStepClientFactory.createNextStepClient("http://localhost:" + port);
         nextStepTestConfiguration.configure(nextStepClient);
         ensureVerificationOtpDefinition();
+        // Ensure allow-lists never leak between tests that mutate them.
+        contactVerificationConfiguration.setAllowedUrlHosts(new java.util.ArrayList<>());
+        contactVerificationConfiguration.setAllowedUrlSchemes(new java.util.ArrayList<>());
     }
 
     @Test
@@ -132,16 +147,18 @@ class NextStepContactVerificationTest extends NextStepTest {
     }
 
     @Test
-    void rejectsOtpConfirmationAfterContactValueChanged() throws NextStepClientException {
+    void rejectsOtpConfirmationAfterContactValueChangedAndDoesNotReviveOnChangeBack() throws NextStepClientException {
         final String userId = createUserWithContact("user@test.test");
         final StartContactVerificationResponse start = startOtp(userId);
 
-        nextStepClient.updateUserContact(userId, CONTACT_NAME, CONTACT_TYPE, "changed@test.test", true);
+        // Value A -> B: the OTP bound to A no longer matches the current value and must not confirm.
+        nextStepClient.updateUserContact(userId, CONTACT_NAME, CONTACT_TYPE, "changed@test.test", false);
+        assertFalse(confirm(userId, CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null).isVerified());
 
-        final ConfirmContactVerificationResponse confirm =
-                confirm(userId, CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null);
-
-        assertFalse(confirm.isVerified());
+        // Value B -> A: even though the current value matches the OTP binding again, the pending OTP was invalidated
+        // on the first change and must not be revived.
+        nextStepClient.updateUserContact(userId, CONTACT_NAME, CONTACT_TYPE, "user@test.test", false);
+        assertFalse(confirm(userId, CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null).isVerified());
         assertNull(singleContact(userId).getVerificationMethod());
     }
 
@@ -270,12 +287,161 @@ class NextStepContactVerificationTest extends NextStepTest {
         assertEquals(InvalidRequestException.CODE, thrown.getError().getCode());
     }
 
+    @Test
+    void rejectsConfirmationForUnknownUserOrContactGenerically() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = startOtp(userId);
+
+        // An unknown contact name and an unknown user must both fail generically (verified=false, 200), exactly like a
+        // wrong OTP, rather than throwing (which would leak whether the user/contact exists).
+        final ConfirmContactVerificationResponse unknownContact =
+                confirm(userId, "NO_SUCH_CONTACT", start.getVerificationId(), start.getOtpValue(), null);
+        assertFalse(unknownContact.isVerified());
+        assertNull(unknownContact.getRemainingAttempts());
+
+        final ConfirmContactVerificationResponse unknownUser =
+                confirm(UUID.randomUUID().toString(), CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null);
+        assertFalse(unknownUser.isVerified());
+        assertNull(unknownUser.getRemainingAttempts());
+    }
+
+    @Test
+    void rejectsDeeplinkStartWithMessageTemplateMissingTokenPlaceholder() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+
+        final NextStepClientException thrown = assertThrows(NextStepClientException.class,
+                () -> startDeeplink(userId, "https://example.com/verify", "https://example.com/verify?code=static"));
+        assertEquals(InvalidRequestException.CODE, thrown.getError().getCode());
+    }
+
+    @Test
+    void substitutesTokenPlaceholderInDeeplinkMessageTemplate() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+
+        final StartContactVerificationResponse start =
+                startDeeplink(userId, "https://example.com/verify", "https://example.com/verify?token={token}");
+        assertNotNull(start.getDeeplinkUrl());
+        assertTrue(start.getDeeplinkUrl().contains("token="));
+        assertFalse(start.getDeeplinkUrl().contains("{token}"));
+    }
+
+    @Test
+    void rejectsStartWhenOtpDefinitionUsesDeterministicAlgorithm() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+
+        // TEST_OTP uses the OTP_DATA_DIGEST (deterministic) algorithm, which would make the OTP value predictable.
+        final NextStepClientException thrown = assertThrows(NextStepClientException.class,
+                () -> nextStepClient.startContactVerification(userId, CONTACT_NAME, CONTACT_TYPE,
+                        ContactVerificationMethod.OTP, DIGEST_OTP_DEFINITION));
+        assertEquals(InvalidConfigurationException.CODE, thrown.getError().getCode());
+    }
+
+    @Test
+    void rejectsStartWhenOtpDefinitionHasNoAttemptLimit() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+
+        final NextStepClientException thrown = assertThrows(NextStepClientException.class,
+                () -> nextStepClient.startContactVerification(userId, CONTACT_NAME, CONTACT_TYPE,
+                        ContactVerificationMethod.OTP, NO_LIMIT_OTP_DEFINITION));
+        assertEquals(InvalidConfigurationException.CODE, thrown.getError().getCode());
+    }
+
+    @Test
+    void rejectsDeeplinkHostNotOnAllowList() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        contactVerificationConfiguration.setAllowedUrlHosts(List.of("allowed.example.com"));
+
+        final NextStepClientException thrown = assertThrows(NextStepClientException.class,
+                () -> startDeeplink(userId, "https://evil.example.com/verify"));
+        assertEquals(InvalidRequestException.CODE, thrown.getError().getCode());
+
+        // A host on the allow-list still succeeds.
+        final StartContactVerificationResponse start = startDeeplink(userId, "https://allowed.example.com/verify");
+        assertNotNull(start.getDeeplinkUrl());
+    }
+
+    @Test
+    void rejectsDeeplinkSchemeNotOnAllowList() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        contactVerificationConfiguration.setAllowedUrlSchemes(List.of("https"));
+
+        final NextStepClientException thrown = assertThrows(NextStepClientException.class,
+                () -> startDeeplink(userId, "myapp://verify"));
+        assertEquals(InvalidRequestException.CODE, thrown.getError().getCode());
+
+        // A scheme on the allow-list still succeeds.
+        final StartContactVerificationResponse start = startDeeplink(userId, "https://example.com/verify");
+        assertNotNull(start.getDeeplinkUrl());
+    }
+
+    @Test
+    void rejectsOtpConfirmationAfterExpiry() throws Exception {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = nextStepClient.startContactVerification(userId, CONTACT_NAME, CONTACT_TYPE,
+                ContactVerificationMethod.OTP, EXPIRING_OTP_DEFINITION).getResponseObject();
+
+        // Wait until the OTP (1s expiry) is past its expiration, then confirm with the correct value -> still fails.
+        Thread.sleep(1500L);
+        final ConfirmContactVerificationResponse confirm =
+                confirm(userId, CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null);
+
+        assertFalse(confirm.isVerified());
+        assertNull(singleContact(userId).getVerificationMethod());
+    }
+
+    @Test
+    void rejectsStartWhenOtpDefinitionHasNoExpiration() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+
+        final NextStepClientException thrown = assertThrows(NextStepClientException.class,
+                () -> nextStepClient.startContactVerification(userId, CONTACT_NAME, CONTACT_TYPE,
+                        ContactVerificationMethod.OTP, NO_EXPIRY_OTP_DEFINITION));
+        assertEquals(InvalidConfigurationException.CODE, thrown.getError().getCode());
+    }
+
+    @Test
+    void rejectsStartWhenOtpDefinitionIsProxyEnabled() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+
+        final NextStepClientException thrown = assertThrows(NextStepClientException.class,
+                () -> nextStepClient.startContactVerification(userId, CONTACT_NAME, CONTACT_TYPE,
+                        ContactVerificationMethod.OTP, PROXY_OTP_DEFINITION));
+        assertEquals(InvalidConfigurationException.CODE, thrown.getError().getCode());
+    }
+
+    @Test
+    void insertsTokenBeforeUrlFragmentInDeeplinkFallback() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+
+        final StartContactVerificationResponse start = startDeeplink(userId, "https://example.com/verify#section");
+        // The token must be a query parameter placed before the preserved fragment, not inside it.
+        assertTrue(start.getDeeplinkUrl().matches("https://example\\.com/verify\\?token=[^#]+#section"));
+    }
+
+    @Test
+    void rollsBackStartWhenFinalDeeplinkUrlInvalid() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse first = startOtp(userId);
+
+        // A template with {token} passes the placeholder check but builds a dangerous final URL that fails validation
+        // after the earlier OTP was removed and a replacement created; the whole start must roll back.
+        assertThrows(NextStepClientException.class,
+                () -> startDeeplink(userId, "https://example.com/verify", "javascript:{token}"));
+
+        // Because the failed start rolled back, the original verification is untouched and still confirms.
+        assertTrue(confirm(userId, CONTACT_NAME, first.getVerificationId(), first.getOtpValue(), null).isVerified());
+    }
+
     private StartContactVerificationResponse startOtp(final String userId) throws NextStepClientException {
         return nextStepClient.startContactVerification(userId, CONTACT_NAME, CONTACT_TYPE,
                 ContactVerificationMethod.OTP, OTP_DEFINITION).getResponseObject();
     }
 
     private StartContactVerificationResponse startDeeplink(final String userId, final String baseUrl) throws NextStepClientException {
+        return startDeeplink(userId, baseUrl, null);
+    }
+
+    private StartContactVerificationResponse startDeeplink(final String userId, final String baseUrl, final String messageTemplate) throws NextStepClientException {
         final com.wultra.security.powerauth.lib.nextstep.model.request.StartContactVerificationRequest request =
                 new com.wultra.security.powerauth.lib.nextstep.model.request.StartContactVerificationRequest();
         request.setUserId(userId);
@@ -284,6 +450,7 @@ class NextStepContactVerificationTest extends NextStepTest {
         request.setMethod(ContactVerificationMethod.DEEPLINK);
         request.setOtpDefinitionName(OTP_DEFINITION);
         request.setDeeplinkBaseUrl(baseUrl);
+        request.setMessageTemplate(messageTemplate);
         return nextStepClient.startContactVerification(request).getResponseObject();
     }
 
@@ -323,7 +490,11 @@ class NextStepContactVerificationTest extends NextStepTest {
     }
 
     private String bindingHash(final String contactName, final ContactType contactType, final String contactValue) {
-        final String input = contactName + '|' + contactType.name() + '|' + contactValue;
+        final byte[] nameBytes = contactName.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        final String typeName = contactType.name();
+        final byte[] typeBytes = typeName.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        final byte[] valueBytes = contactValue.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        final String input = nameBytes.length + ":" + contactName + ":" + typeBytes.length + ":" + typeName + ":" + valueBytes.length + ":" + contactValue;
         final byte[] hash;
         try {
             hash = java.security.MessageDigest.getInstance("SHA-256")
@@ -342,27 +513,41 @@ class NextStepContactVerificationTest extends NextStepTest {
     private void ensureVerificationOtpDefinition() throws NextStepClientException {
         final OtpGenerationParam genParam = new OtpGenerationParam();
         genParam.setGroupSize(2);
-        final CreateOtpPolicyRequest policyRequest = new CreateOtpPolicyRequest();
-        policyRequest.setOtpPolicyName("CONTACT_VERIFICATION_OTP_POLICY");
-        policyRequest.setAttemptLimit(3);
-        policyRequest.setLength(8);
-        policyRequest.setExpirationTime(300L);
-        policyRequest.setGenAlgorithm(OtpGenerationAlgorithm.OTP_RANDOM_DIGIT_GROUPS);
-        policyRequest.setGenParam(genParam);
-        try {
-            nextStepClient.createOtpPolicy(policyRequest);
-        } catch (NextStepClientException ex) {
-            // Policy already provisioned by an earlier test in the shared context.
-        }
+        // Standard definition used by the happy-path and most negative tests.
+        provisionOtp("CONTACT_VERIFICATION_OTP_POLICY", OTP_DEFINITION, 3, 300L,
+                OtpGenerationAlgorithm.OTP_RANDOM_DIGIT_GROUPS, false, genParam);
+        // Definitions that each violate one start-time configuration guard.
+        provisionOtp("CONTACT_VERIFICATION_NO_LIMIT_POLICY", NO_LIMIT_OTP_DEFINITION, null, 300L,
+                OtpGenerationAlgorithm.OTP_RANDOM_DIGIT_GROUPS, false, genParam);
+        provisionOtp("CONTACT_VERIFICATION_NO_EXPIRY_POLICY", NO_EXPIRY_OTP_DEFINITION, 3, null,
+                OtpGenerationAlgorithm.OTP_RANDOM_DIGIT_GROUPS, false, genParam);
+        provisionOtp("CONTACT_VERIFICATION_PROXY_POLICY", PROXY_OTP_DEFINITION, 3, 300L,
+                OtpGenerationAlgorithm.OTP_RANDOM_DIGIT_GROUPS, true, genParam);
+        // Short-lived definition used to assert that an expired OTP cannot be confirmed.
+        provisionOtp("CONTACT_VERIFICATION_EXPIRING_POLICY", EXPIRING_OTP_DEFINITION, 3, 1L,
+                OtpGenerationAlgorithm.OTP_RANDOM_DIGIT_GROUPS, false, genParam);
+    }
 
-        final CreateOtpDefinitionRequest definitionRequest = new CreateOtpDefinitionRequest();
-        definitionRequest.setOtpDefinitionName(OTP_DEFINITION);
-        definitionRequest.setApplicationName("TEST_APP");
-        definitionRequest.setOtpPolicyName("CONTACT_VERIFICATION_OTP_POLICY");
+    private void provisionOtp(final String policyName, final String definitionName, final Integer attemptLimit,
+                              final Long expirationTime, final OtpGenerationAlgorithm algorithm, final boolean proxyEnabled,
+                              final OtpGenerationParam genParam) {
+        final CreateOtpPolicyRequest policy = new CreateOtpPolicyRequest();
+        policy.setOtpPolicyName(policyName);
+        policy.setAttemptLimit(attemptLimit);
+        policy.setLength(8);
+        policy.setExpirationTime(expirationTime);
+        policy.setGenAlgorithm(algorithm);
+        policy.setGenParam(genParam);
+        final CreateOtpDefinitionRequest definition = new CreateOtpDefinitionRequest();
+        definition.setOtpDefinitionName(definitionName);
+        definition.setApplicationName("TEST_APP");
+        definition.setOtpPolicyName(policyName);
+        definition.setDataAdapterProxyEnabled(proxyEnabled);
         try {
-            nextStepClient.createOtpDefinition(definitionRequest);
+            nextStepClient.createOtpPolicy(policy);
+            nextStepClient.createOtpDefinition(definition);
         } catch (NextStepClientException ex) {
-            // Definition already provisioned by an earlier test in the shared context.
+            // Policy/definition already provisioned by an earlier test in the shared Spring context.
         }
     }
 

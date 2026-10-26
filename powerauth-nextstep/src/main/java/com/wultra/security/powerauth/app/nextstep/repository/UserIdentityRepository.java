@@ -18,6 +18,8 @@
 package com.wultra.security.powerauth.app.nextstep.repository;
 
 import com.wultra.security.powerauth.app.nextstep.repository.model.entity.UserIdentityEntity;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -50,5 +53,15 @@ public interface UserIdentityRepository extends CrudRepository<UserIdentityEntit
      */
     @Query(value = "from UserIdentityEntity u where u.timestampCreated BETWEEN :startDate AND :endDate")
     Stream<UserIdentityEntity> findUserIdentitiesByCreatedDate(@Param("startDate") Date startDate, @Param("endDate") Date endDate);
+
+    /**
+     * Find a user identity and acquire a pessimistic write lock on its row. Serializes concurrent contact
+     * verification start/confirm and contact value updates for the same user (standard SELECT ... FOR UPDATE).
+     * @param userId User ID.
+     * @return User identity entity, if found.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM UserIdentityEntity u WHERE u.userId = :userId")
+    Optional<UserIdentityEntity> findAndLockByUserId(@Param("userId") String userId);
 
 }
