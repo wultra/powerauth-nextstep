@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added verification tracking (`verificationMethod`, `timestampVerified`) to user contacts [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
+- Added an OTP/deeplink contact verification flow (`POST /user/contact/verification/start` and `POST /user/contact/verification/confirm`) that issues a one-time password and returns it to the caller as an OTP value or deeplink URL for delivery to the contact; the caller owns the delivery channel and message template. Deeplink base URLs are validated (absolute URI required, dangerous schemes `javascript`/`data`/`file`/`vbscript` rejected, optional `powerauth.nextstep.contact-verification.allowed-url-hosts` / `allowed-url-schemes` allow-lists). Residual risk: custom-scheme deeplinks can be hijacked by other apps on the device and the token may be intercepted in transit [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
+
 ### Changed
 
 - Changed Docker images to be based on the Wultra base image [(#63)](https://github.com/wultra/powerauth-nextstep/issues/63)

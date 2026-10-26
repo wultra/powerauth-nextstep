@@ -58,6 +58,7 @@ public class UserController {
     private final UserAliasService userAliasService;
     private final CredentialService credentialService;
     private final AuthenticationService authenticationService;
+    private final ContactVerificationService contactVerificationService;
 
     /**
      * REST controller constructor.
@@ -68,9 +69,10 @@ public class UserController {
      * @param userAliasService User alias service.
      * @param credentialService Credential service.
      * @param authenticationService Authentication service.
+     * @param contactVerificationService Contact verification service.
      */
     @Autowired
-    public UserController(UserIdentityService userIdentityService, UserIdentityLookupService userIdentityLookupService, UserRoleService userRoleService, UserContactService userContactService, UserAliasService userAliasService, CredentialService credentialService, AuthenticationService authenticationService) {
+    public UserController(UserIdentityService userIdentityService, UserIdentityLookupService userIdentityLookupService, UserRoleService userRoleService, UserContactService userContactService, UserAliasService userAliasService, CredentialService credentialService, AuthenticationService authenticationService, ContactVerificationService contactVerificationService) {
         this.userIdentityService = userIdentityService;
         this.userIdentityLookupService = userIdentityLookupService;
         this.userRoleService = userRoleService;
@@ -78,6 +80,7 @@ public class UserController {
         this.userAliasService = userAliasService;
         this.credentialService = credentialService;
         this.authenticationService = authenticationService;
+        this.contactVerificationService = contactVerificationService;
     }
 
     /**
@@ -463,6 +466,76 @@ public class UserController {
         logger.info("Received deleteUserContact request, user ID: {}, contact name: {}", request.getRequestObject().getUserId(), request.getRequestObject().getContactName());
         final DeleteUserContactResponse response = userContactService.deleteUserContact(request.getRequestObject());
         logger.info("The deleteUserContact request succeeded, user ID: {}, contact name: {}", request.getRequestObject().getUserId(), request.getRequestObject().getContactName());
+        return new ObjectResponse<>(response);
+    }
+
+    /**
+     * Start verification of a user contact. The OTP value or deeplink URL returned in the response must be delivered to the contact by the caller.
+     * @param request Start contact verification request.
+     * @return Start contact verification response.
+     * @throws UserNotFoundException Thrown when user identity is not found.
+     * @throws UserContactNotFoundException Thrown when user contact is not found.
+     * @throws InvalidRequestException Thrown when the request is invalid.
+     * @throws InvalidConfigurationException Thrown when the OTP definition configuration is invalid.
+     * @throws OtpDefinitionNotFoundException Thrown when the OTP definition is not found.
+     * @throws UserNotActiveException Thrown when the user identity is not active.
+     * @throws CredentialDefinitionNotFoundException Thrown when a credential definition is not found.
+     * @throws OperationNotFoundException Thrown when an operation is not found.
+     * @throws OtpGenAlgorithmNotSupportedException Thrown when the OTP generation algorithm is not supported.
+     * @throws OperationAlreadyFinishedException Thrown when an operation is already finished.
+     * @throws OperationAlreadyFailedException Thrown when an operation is already failed.
+     * @throws CredentialNotActiveException Thrown when a credential is not active.
+     * @throws CredentialNotFoundException Thrown when a credential is not found.
+     * @throws OtpNotFoundException Thrown when the created OTP cannot be read back.
+     * @throws EncryptionException Thrown when encryption or decryption fails.
+     */
+    @Operation(summary = "Start verification of a user contact")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Contact verification was started"),
+            @ApiResponse(responseCode = "400", description = "Invalid request, error codes: REQUEST_VALIDATION_FAILED, USER_IDENTITY_NOT_FOUND, USER_CONTACT_NOT_FOUND, INVALID_REQUEST, INVALID_CONFIGURATION, OTP_DEFINITION_NOT_FOUND"),
+            @ApiResponse(responseCode = "500", description = "Unexpected error")
+    })
+    @PostMapping("contact/verification/start")
+    public ObjectResponse<StartContactVerificationResponse> startContactVerification(@Valid @RequestBody ObjectRequest<StartContactVerificationRequest> request) throws UserNotFoundException, UserContactNotFoundException,
+            InvalidRequestException, InvalidConfigurationException, OtpDefinitionNotFoundException, UserNotActiveException, CredentialDefinitionNotFoundException,
+            OperationNotFoundException, OtpGenAlgorithmNotSupportedException, OperationAlreadyFinishedException, OperationAlreadyFailedException,
+            CredentialNotActiveException, CredentialNotFoundException, OtpNotFoundException, EncryptionException {
+        logger.info("Received startContactVerification request, user ID: {}, contact name: {}", request.getRequestObject().getUserId(), request.getRequestObject().getContactName());
+        final StartContactVerificationResponse response = contactVerificationService.startContactVerification(request.getRequestObject());
+        logger.info("The startContactVerification request succeeded, user ID: {}, contact name: {}", request.getRequestObject().getUserId(), request.getRequestObject().getContactName());
+        return new ObjectResponse<>(response);
+    }
+
+    /**
+     * Confirm verification of a user contact using the OTP value or deeplink token supplied by the caller.
+     * @param request Confirm contact verification request.
+     * @return Confirm contact verification response.
+     * @throws UserNotFoundException Thrown when user identity is not found.
+     * @throws UserContactNotFoundException Thrown when user contact is not found.
+     * @throws InvalidRequestException Thrown when the request is invalid.
+     * @throws InvalidConfigurationException Thrown when the configuration is invalid.
+     * @throws OperationNotFoundException Thrown when an operation is not found.
+     * @throws CredentialNotFoundException Thrown when a credential is not found.
+     * @throws OperationAlreadyCanceledException Thrown when an operation is already canceled.
+     * @throws OperationAlreadyFinishedException Thrown when an operation is already finished.
+     * @throws AuthMethodNotFoundException Thrown when an authentication method is not found.
+     * @throws OperationAlreadyFailedException Thrown when an operation is already failed.
+     * @throws OperationNotValidException Thrown when an operation is not valid.
+     * @throws EncryptionException Thrown when encryption or decryption fails.
+     */
+    @Operation(summary = "Confirm verification of a user contact")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Contact verification was processed"),
+            @ApiResponse(responseCode = "400", description = "Invalid request, error codes: REQUEST_VALIDATION_FAILED, USER_IDENTITY_NOT_FOUND, USER_CONTACT_NOT_FOUND, INVALID_REQUEST, INVALID_CONFIGURATION"),
+            @ApiResponse(responseCode = "500", description = "Unexpected error")
+    })
+    @PostMapping("contact/verification/confirm")
+    public ObjectResponse<ConfirmContactVerificationResponse> confirmContactVerification(@Valid @RequestBody ObjectRequest<ConfirmContactVerificationRequest> request) throws UserNotFoundException, UserContactNotFoundException,
+            InvalidRequestException, InvalidConfigurationException, OperationNotFoundException, CredentialNotFoundException, OperationAlreadyCanceledException,
+            OperationAlreadyFinishedException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
+        logger.info("Received confirmContactVerification request, user ID: {}, contact name: {}", request.getRequestObject().getUserId(), request.getRequestObject().getContactName());
+        final ConfirmContactVerificationResponse response = contactVerificationService.confirmContactVerification(request.getRequestObject());
+        logger.info("The confirmContactVerification request succeeded, user ID: {}, contact name: {}, verified: {}", request.getRequestObject().getUserId(), request.getRequestObject().getContactName(), response.isVerified());
         return new ObjectResponse<>(response);
     }
 

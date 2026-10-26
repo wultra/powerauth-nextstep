@@ -101,6 +101,8 @@ Following topics are covered in this chapter:
   - [List user contacts](#list-user-contacts)
   - [Update a user contact](#update-a-user-contact)
   - [Delete a user contact](#delete-a-user-contact)
+  - [Start verification of a user contact](#start-verification-of-a-user-contact)
+  - [Confirm verification of a user contact](#confirm-verification-of-a-user-contact)
   - [Create a user alias](#create-a-user-alias)
   - [List user aliases](#list-user-aliases)
   - [Update a user alias](#update-a-user-alias)
@@ -6817,6 +6819,8 @@ The list of expected status codes:
 
 Create a user contact.
 
+The optional `verificationMethod` field asserts that the caller has already verified the contact. Allowed values are `OTP`, `DEEPLINK` and `MANUAL`. When present, the server records the method and sets `timestampVerified` to the current server time; when omitted, the contact is created as unverified (both fields `null`). Setting `verificationMethod` is a trust assertion and is the responsibility of the calling system.
+
 <!-- begin remove -->
 <table>
     <tr>
@@ -6852,7 +6856,8 @@ The list of expected status codes:
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE",
     "contactValue": "+420602123456",
-    "primary": true
+    "primary": true,
+    "verificationMethod": "OTP"
   }
 }
 ```
@@ -6870,7 +6875,9 @@ The list of expected status codes:
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE",
     "contactValue": "+420602123456",
-    "primary": true
+    "primary": true,
+    "verificationMethod": "OTP",
+    "timestampVerified": "2021-07-02T09:47:36+0000"
   }
 }
 ```
@@ -6947,7 +6954,9 @@ The list of expected status codes:
         "contactValue": "+4201234567",
         "primary": false,
         "timestampCreated": "2021-07-02T09:47:36+0000",
-        "timestampLastUpdated": "2021-07-02T11:27:30+0000"
+        "timestampLastUpdated": "2021-07-02T11:27:30+0000",
+        "verificationMethod": "OTP",
+        "timestampVerified": "2021-07-02T11:27:30+0000"
       }
     ]
   }
@@ -6959,6 +6968,16 @@ The list of expected status codes:
 ### Update a User Contact
 
 Update a user contact.
+
+The optional `verificationMethod` field (`OTP`, `DEEPLINK` or `MANUAL`) controls the verification state, which is updated according to the following rules:
+
+- Contact value **unchanged**, `verificationMethod` omitted: the existing verification is preserved.
+- Contact value **unchanged**, `verificationMethod` equal to the stored method: idempotent, the stored `timestampVerified` is preserved.
+- Contact value **unchanged**, `verificationMethod` is a different non-null method: the method is updated and `timestampVerified` is set to the current server time.
+- Contact value **changed**, `verificationMethod` omitted: the verification is reset (both `verificationMethod` and `timestampVerified` become `null`).
+- Contact value **changed**, `verificationMethod` present: the method is recorded and `timestampVerified` is set to the current server time.
+
+`timestampVerified` is always server-generated and is never taken from the request. There is no way to explicitly unverify a contact without changing its value.
 
 This method has a `POST /user/contact/update` alternative.
 
@@ -7009,7 +7028,8 @@ The list of expected status codes:
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE",
     "contactValue": "+420605789651",
-    "primary": true
+    "primary": true,
+    "verificationMethod": "OTP"
   }
 }
 ```
@@ -7027,7 +7047,9 @@ The list of expected status codes:
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE",
     "contactValue": "+420605789651",
-    "primary": true
+    "primary": true,
+    "verificationMethod": "OTP",
+    "timestampVerified": "2021-07-02T11:27:30+0000"
   }
 }
 ```
@@ -7089,6 +7111,150 @@ The list of expected status codes:
     "userId": "test1234",
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE"
+  }
+}
+```
+<!-- end -->
+
+<!-- begin api POST /user/contact/verification/start -->
+### Start Verification of a User Contact
+
+Start verification of a user contact by issuing a one-time password. The OTP value (for the `OTP` method) or the deeplink URL (for the `DEEPLINK` method) is returned in the response; Next Step does **not** deliver it. The caller is responsible for delivering the OTP value or deeplink URL to the contact through its own channel and message template.
+
+The `method` must be either `OTP` or `DEEPLINK` (`MANUAL` cannot be started). The referenced OTP definition (`otpDefinitionName`) **must use a random generation algorithm** (`OTP_RANDOM_DIGIT_GROUPS`); a definition using `OTP_DATA_DIGEST` is rejected with `INVALID_CONFIGURATION`, because its value would be a predictable digest of the internal binding data. The OTP policy **must also define a finite attempt limit** (`attemptLimit`); a definition whose policy has no attempt limit is rejected with `INVALID_CONFIGURATION`, because the contact-verification flow relies on the attempt limit to prevent brute-force guessing of the OTP value. The OTP is operation-less and bound to the user and the current contact value; the `expiresAt` timestamp and the number of allowed attempts follow the OTP policy of the definition. Starting a new verification removes any earlier active verification for the same contact.
+
+For the `DEEPLINK` method, `deeplinkBaseUrl` is required. The base URL is validated: it must be an absolute, parseable URI; the dangerous schemes `javascript`, `data`, `file` and `vbscript` are always rejected. Any other scheme (including custom mobile deeplink schemes such as `myapp://` and `https`/`http` app/universal links) is accepted. Optional allow-lists `powerauth.nextstep.contact-verification.allowed-url-schemes` (restricts the scheme when set) and `powerauth.nextstep.contact-verification.allowed-url-hosts` (restricts the host of `http`/`https` URLs when set) further constrain the URL. When a `messageTemplate` containing a `{token}` placeholder is supplied, the token is substituted into the template; otherwise the token is appended to the base URL as a `token` query parameter.
+
+**Residual risk:** a custom-scheme deeplink can be claimed by another application installed on the device, and the token can be intercepted in transit. Operators must size the OTP length appropriately and treat the delivery channel as untrusted.
+
+<!-- begin remove -->
+<table>
+    <tr>
+        <td>Method</td>
+        <td><code>POST</code></td>
+    </tr>
+    <tr>
+        <td>Resource URI</td>
+        <td><code>/user/contact/verification/start</code></td>
+    </tr>
+</table>
+<!-- end -->
+
+The list of expected status codes:
+
+| Code | Description |
+|------|-------------|
+| 200  | OK response - request succeeded |
+| 400  | `REQUEST_VALIDATION_FAILED` - request validation failed |
+| 400  | `USER_IDENTITY_NOT_FOUND` - user identity with identifier specified in the request was not found |
+| 400  | `USER_CONTACT_NOT_FOUND` - user contact was not found |
+| 400  | `INVALID_REQUEST` - the method is not `OTP`/`DEEPLINK` or the deeplink base URL is invalid |
+| 400  | `INVALID_CONFIGURATION` - the OTP definition does not use a random generation algorithm, or its OTP policy does not define an attempt limit |
+| 400  | `OTP_DEFINITION_NOT_FOUND` - the OTP definition was not found |
+| 500  | Server error - unexpected error occurred |
+
+#### Request
+
+- Headers:
+  - `Content-Type: application/json`
+
+```json
+{
+  "requestObject": {
+    "userId": "test1234",
+    "contactName": "TEST_CONTACT",
+    "contactType": "PHONE",
+    "method": "OTP",
+    "otpDefinitionName": "CONTACT_VERIFICATION",
+    "deeplinkBaseUrl": null,
+    "messageTemplate": null,
+    "language": "en"
+  }
+}
+```
+
+#### Response 200
+
+- Headers:
+  - `Content-Type: application/json`
+
+```json
+{
+  "status": "OK",
+  "responseObject": {
+    "verificationId": "f1e2d3c4-b5a6-7890-abcd-ef0123456789",
+    "contactName": "TEST_CONTACT",
+    "contactType": "PHONE",
+    "method": "OTP",
+    "expiresAt": "2026-10-26T18:30:00Z",
+    "otpValue": "12345678",
+    "deeplinkUrl": null
+  }
+}
+```
+<!-- end -->
+
+<!-- begin api POST /user/contact/verification/confirm -->
+### Confirm Verification of a User Contact
+
+Confirm verification of a user contact. The caller supplies the `otpValue` entered by the user (for the `OTP` method) or the `token` extracted from the deeplink (for the `DEEPLINK` method); the service verifies whichever value is present against the OTP identified by `verificationId`.
+
+Verification fails generically (`verified: false`, without revealing the cause) when the OTP is unknown, expired, blocked, already used, bound to a different user, or when the contact value changed since the verification was started. The attempt limit from the OTP policy is enforced: once it is reached, the OTP is invalidated and cannot be retried (`remainingAttempts` reaches `0`). On success the contact's `verificationMethod` is set to the confirmed method (overwriting a previous `MANUAL` verification) and `timestampVerified` is set to the current server time. The verification method (`OTP` or `DEEPLINK`) is persisted on the OTP when the verification is started and read authoritatively at confirmation; the supplied credential must match it: a verification started as `OTP` must be confirmed with `otpValue`, and one started as `DEEPLINK` with `token`. A mismatched or missing credential fails generically, and an OTP not issued by the verification flow cannot be confirmed here.
+
+<!-- begin remove -->
+<table>
+    <tr>
+        <td>Method</td>
+        <td><code>POST</code></td>
+    </tr>
+    <tr>
+        <td>Resource URI</td>
+        <td><code>/user/contact/verification/confirm</code></td>
+    </tr>
+</table>
+<!-- end -->
+
+The list of expected status codes:
+
+| Code | Description |
+|------|-------------|
+| 200  | OK response - request processed (see `verified` flag) |
+| 400  | `REQUEST_VALIDATION_FAILED` - request validation failed |
+| 400  | `USER_IDENTITY_NOT_FOUND` - user identity with identifier specified in the request was not found |
+| 400  | `USER_CONTACT_NOT_FOUND` - user contact was not found |
+| 500  | Server error - unexpected error occurred |
+
+#### Request
+
+- Headers:
+  - `Content-Type: application/json`
+
+```json
+{
+  "requestObject": {
+    "userId": "test1234",
+    "contactName": "TEST_CONTACT",
+    "contactType": "PHONE",
+    "verificationId": "f1e2d3c4-b5a6-7890-abcd-ef0123456789",
+    "otpValue": "12345678",
+    "token": null
+  }
+}
+```
+
+#### Response 200
+
+- Headers:
+  - `Content-Type: application/json`
+
+```json
+{
+  "status": "OK",
+  "responseObject": {
+    "verified": true,
+    "remainingAttempts": null,
+    "verificationMethod": "OTP",
+    "timestampVerified": "2026-10-26T18:25:00Z"
   }
 }
 ```

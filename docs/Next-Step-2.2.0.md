@@ -35,6 +35,10 @@ Added a new indexed column `subject_id` holding an identifier linking the audit 
 The auditing tables may be already updated in your database schema if the database schema is not separated for different PowerAuth applications. In case the column `audit_log.subject_id` and its index `audit_log_subject_id_idx` are already present, you can safely skip this migration step.
 <!-- end -->
 
+### `ns_user_contact` Table (since 2.2.3)
+
+A new Liquibase changeset adds two nullable columns to the `ns_user_contact` table to track contact verification: `verification_method` (`varchar(32)`) and `timestamp_verified` (`timestamp`). Both are nullable with no default value; existing rows remain unverified (`null`). No manual action or data backfill is required.
+
 
 ## Dependency Updates
 

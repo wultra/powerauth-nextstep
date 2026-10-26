@@ -42,6 +42,8 @@ public class UserContactConverter {
         contactDetail.setPrimary(contact.isPrimary());
         contactDetail.setTimestampCreated(contact.getTimestampCreated());
         contactDetail.setTimestampLastUpdated(contact.getTimestampLastUpdated());
+        contactDetail.setVerificationMethod(contact.getVerificationMethod());
+        contactDetail.setTimestampVerified(contact.getTimestampVerified());
         return contactDetail;
     }
 

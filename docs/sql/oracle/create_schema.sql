@@ -135,6 +135,8 @@ CREATE TABLE ns_user_contact (
   is_primary NUMBER(1) DEFAULT 0 NOT NULL,
   timestamp_created TIMESTAMP DEFAULT sysdate,
   timestamp_last_updated TIMESTAMP,
+  verification_method VARCHAR2(32 CHAR),
+  timestamp_verified TIMESTAMP,
   CONSTRAINT ns_user_contact_fk FOREIGN KEY (user_id) REFERENCES ns_user_identity (user_id)
 );
 
@@ -284,6 +286,7 @@ CREATE TABLE ns_otp_storage (
   attempt_counter NUMBER(19,0) DEFAULT 0 NOT NULL,
   failed_attempt_counter NUMBER(19,0) DEFAULT 0 NOT NULL,
   encryption_algorithm VARCHAR2(256 CHAR),
+  verification_method VARCHAR2(32 CHAR),
   timestamp_created TIMESTAMP DEFAULT sysdate,
   timestamp_verified TIMESTAMP,
   timestamp_blocked TIMESTAMP,

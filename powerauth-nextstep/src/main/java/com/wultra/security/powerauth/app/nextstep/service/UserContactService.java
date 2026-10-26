@@ -27,6 +27,7 @@ import com.wultra.security.powerauth.app.nextstep.repository.model.entity.UserId
 import com.wultra.security.powerauth.app.nextstep.service.catalogue.ServiceCatalogue;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.UserContactDetail;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserContactAlreadyExistsException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserContactNotFoundException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserNotFoundException;
@@ -47,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -104,6 +106,11 @@ public class UserContactService {
         contact.setValue(request.getContactValue());
         contact.setPrimary(request.isPrimary());
         contact.setTimestampCreated(new Date());
+        final ContactVerificationMethod verificationMethod = request.getVerificationMethod();
+        if (verificationMethod != null) {
+            contact.setVerificationMethod(verificationMethod);
+            contact.setTimestampVerified(new Date());
+        }
         user.getContacts().add(contact);
         // Ensure primary contacts are unique
         ensurePrimaryContactsAreUnique(user);
@@ -113,6 +120,7 @@ public class UserContactService {
                 .type(AUDIT_TYPE_USER_IDENTITY)
                 .param("userId", user.getUserId())
                 .param("contactName", contact.getName())
+                .param("verificationMethod", contact.getVerificationMethod())
                 .build());
         final CreateUserContactResponse response = new CreateUserContactResponse();
         response.setUserId(user.getUserId());
@@ -120,6 +128,8 @@ public class UserContactService {
         response.setContactType(contact.getType());
         response.setContactValue(contact.getValue());
         response.setPrimary(contact.isPrimary());
+        response.setVerificationMethod(contact.getVerificationMethod());
+        response.setTimestampVerified(contact.getTimestampVerified());
         return response;
     }
 
@@ -160,12 +170,32 @@ public class UserContactService {
             throw new UserContactNotFoundException("User contact not found: " + request.getContactName() + ", user ID: " + user.getUserId() + ", type: " + request.getContactType());
         }
         final UserContactEntity contact = contactOptional.get();
+        final boolean valueChanged = !Objects.equals(contact.getValue(), request.getContactValue());
+        final ContactVerificationMethod requestedMethod = request.getVerificationMethod();
+        boolean verificationReset = false;
         contact.setUser(user);
         contact.setName(request.getContactName());
         contact.setType(request.getContactType());
         contact.setValue(request.getContactValue());
         contact.setPrimary(request.isPrimary());
         contact.setTimestampLastUpdated(new Date());
+        if (valueChanged) {
+            if (requestedMethod == null) {
+                // New value is unverified, reset any existing verification
+                verificationReset = contact.getVerificationMethod() != null;
+                contact.setVerificationMethod(null);
+                contact.setTimestampVerified(null);
+            } else {
+                // Trusted caller verified the new value
+                contact.setVerificationMethod(requestedMethod);
+                contact.setTimestampVerified(new Date());
+            }
+        } else if (requestedMethod != null && !requestedMethod.equals(contact.getVerificationMethod())) {
+            // Value unchanged but a different verification method was asserted
+            contact.setVerificationMethod(requestedMethod);
+            contact.setTimestampVerified(new Date());
+        }
+        // Otherwise the existing verification is preserved (unchanged value with no or idempotent method)
         // Ensure primary contacts are unique
         ensurePrimaryContactsAreUnique(user);
         user = userIdentityRepository.save(user);
@@ -174,6 +204,8 @@ public class UserContactService {
                 .type(AUDIT_TYPE_USER_IDENTITY)
                 .param("userId", user.getUserId())
                 .param("contactName", contact.getName())
+                .param("verificationMethod", contact.getVerificationMethod())
+                .param("verificationReset", verificationReset)
                 .build());
         UpdateUserContactResponse response = new UpdateUserContactResponse();
         response.setUserId(user.getUserId());
@@ -181,6 +213,8 @@ public class UserContactService {
         response.setContactType(contact.getType());
         response.setContactValue(contact.getValue());
         response.setPrimary(contact.isPrimary());
+        response.setVerificationMethod(contact.getVerificationMethod());
+        response.setTimestampVerified(contact.getTimestampVerified());
         return response;
     }
 
@@ -213,6 +247,47 @@ public class UserContactService {
         response.setUserId(user.getUserId());
         response.setContactName(request.getContactName());
         response.setContactType(request.getContactType());
+        return response;
+    }
+
+    /**
+     * Mark a user contact as verified using the given verification method. The verification timestamp is set server-side.
+     * @param userId User identity identifier.
+     * @param contactName Contact name.
+     * @param contactType Contact type.
+     * @param method Verification method that confirmed the contact.
+     * @return Update user contact response echoing the contact state.
+     * @throws UserNotFoundException Thrown when user identity is not found.
+     * @throws UserContactNotFoundException Thrown when user contact is not found.
+     */
+    @Transactional
+    public UpdateUserContactResponse markContactVerified(String userId, String contactName, ContactType contactType, ContactVerificationMethod method) throws UserNotFoundException, UserContactNotFoundException {
+        final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
+        UserIdentityEntity user = userIdentityLookupService.findUser(userId);
+        final Set<UserContactEntity> contacts = user.getContacts();
+        final Optional<UserContactEntity> contactOptional = contacts.stream().filter(c -> c.getName().equals(contactName) && c.getType().equals(contactType)).findFirst();
+        if (contactOptional.isEmpty()) {
+            throw new UserContactNotFoundException("User contact not found: " + contactName + ", user ID: " + user.getUserId() + ", type: " + contactType);
+        }
+        final UserContactEntity contact = contactOptional.get();
+        contact.setVerificationMethod(method);
+        contact.setTimestampVerified(new Date());
+        user = userIdentityRepository.save(user);
+        logger.debug("User contact was verified, user ID: {}, contact name: {}", user.getUserId(), contact.getName());
+        audit.info("User contact was verified", AuditDetail.builder()
+                .type(AUDIT_TYPE_USER_IDENTITY)
+                .param("userId", user.getUserId())
+                .param("contactName", contact.getName())
+                .param("verificationMethod", contact.getVerificationMethod())
+                .build());
+        final UpdateUserContactResponse response = new UpdateUserContactResponse();
+        response.setUserId(user.getUserId());
+        response.setContactName(contact.getName());
+        response.setContactType(contact.getType());
+        response.setContactValue(contact.getValue());
+        response.setPrimary(contact.isPrimary());
+        response.setVerificationMethod(contact.getVerificationMethod());
+        response.setTimestampVerified(contact.getTimestampVerified());
         return response;
     }
 

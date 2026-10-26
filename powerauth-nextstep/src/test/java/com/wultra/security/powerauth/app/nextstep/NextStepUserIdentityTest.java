@@ -19,10 +19,13 @@ package com.wultra.security.powerauth.app.nextstep;
 
 import com.wultra.security.powerauth.lib.nextstep.client.NextStepClientException;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.CredentialSecretDetail;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.UserContactDetail;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.*;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserNotActiveException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserNotBlockedException;
+import com.wultra.security.powerauth.lib.nextstep.model.request.CreateUserContactRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateUserRequest;
+import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateUserContactRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateUserRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.response.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -252,6 +255,127 @@ class NextStepUserIdentityTest extends NextStepTest {
         assertEquals(userId, r5.getUserId());
         GetUserContactListResponse r6 = nextStepClient.getUserContactList(userId).getResponseObject();
         assertTrue(r6.getContacts().isEmpty());
+    }
+
+    @Test
+    void testContactCreatedWithoutVerificationMethodIsUnverified() throws NextStepClientException {
+        final String userId = createUserIdentity();
+
+        final CreateUserContactResponse created = createContact(userId, "test@test.test", null);
+        assertNull(created.getVerificationMethod());
+        assertNull(created.getTimestampVerified());
+
+        final UserContactDetail listed = singleContact(userId);
+        assertNull(listed.getVerificationMethod());
+        assertNull(listed.getTimestampVerified());
+    }
+
+    @Test
+    void testContactCreatedWithVerificationMethodIsVerified() throws NextStepClientException {
+        final String userId = createUserIdentity();
+
+        final CreateUserContactResponse created = createContact(userId, "test@test.test", ContactVerificationMethod.MANUAL);
+        assertEquals(ContactVerificationMethod.MANUAL, created.getVerificationMethod());
+        assertNotNull(created.getTimestampVerified());
+
+        final UserContactDetail listed = singleContact(userId);
+        assertEquals(ContactVerificationMethod.MANUAL, listed.getVerificationMethod());
+        assertEquals(created.getTimestampVerified(), listed.getTimestampVerified());
+    }
+
+    @Test
+    void testUpdateWithUnchangedValueAndNoMethodPreservesVerification() throws NextStepClientException {
+        final String userId = createUserIdentity();
+        final CreateUserContactResponse created = createContact(userId, "test@test.test", ContactVerificationMethod.OTP);
+
+        final UpdateUserContactResponse updated = updateContact(userId, "test@test.test", null);
+        assertEquals(ContactVerificationMethod.OTP, updated.getVerificationMethod());
+        assertEquals(created.getTimestampVerified(), updated.getTimestampVerified());
+    }
+
+    @Test
+    void testUpdateWithUnchangedValueAndSameMethodIsIdempotent() throws NextStepClientException {
+        final String userId = createUserIdentity();
+        final CreateUserContactResponse created = createContact(userId, "test@test.test", ContactVerificationMethod.OTP);
+
+        final UpdateUserContactResponse updated = updateContact(userId, "test@test.test", ContactVerificationMethod.OTP);
+        assertEquals(ContactVerificationMethod.OTP, updated.getVerificationMethod());
+        assertEquals(created.getTimestampVerified(), updated.getTimestampVerified());
+    }
+
+    @Test
+    void testUpdateWithUnchangedValueAndDifferentMethodReverifies() throws Exception {
+        final String userId = createUserIdentity();
+        final CreateUserContactResponse created = createContact(userId, "test@test.test", ContactVerificationMethod.MANUAL);
+        Thread.sleep(10);
+
+        final UpdateUserContactResponse updated = updateContact(userId, "test@test.test", ContactVerificationMethod.OTP);
+        assertEquals(ContactVerificationMethod.OTP, updated.getVerificationMethod());
+        assertNotNull(updated.getTimestampVerified());
+        assertTrue(updated.getTimestampVerified().after(created.getTimestampVerified()));
+    }
+
+    @Test
+    void testUpdateWithChangedValueAndNoMethodResetsVerification() throws NextStepClientException {
+        final String userId = createUserIdentity();
+        createContact(userId, "test@test.test", ContactVerificationMethod.MANUAL);
+
+        final UpdateUserContactResponse updated = updateContact(userId, "changed@test.test", null);
+        assertNull(updated.getVerificationMethod());
+        assertNull(updated.getTimestampVerified());
+
+        final UserContactDetail listed = singleContact(userId);
+        assertNull(listed.getVerificationMethod());
+        assertNull(listed.getTimestampVerified());
+    }
+
+    @Test
+    void testUpdateWithChangedValueAndMethodVerifiesNewValue() throws Exception {
+        final String userId = createUserIdentity();
+        final CreateUserContactResponse created = createContact(userId, "test@test.test", ContactVerificationMethod.OTP);
+        Thread.sleep(10);
+
+        final UpdateUserContactResponse updated = updateContact(userId, "changed@test.test", ContactVerificationMethod.MANUAL);
+        assertEquals("changed@test.test", updated.getContactValue());
+        assertEquals(ContactVerificationMethod.MANUAL, updated.getVerificationMethod());
+        assertNotNull(updated.getTimestampVerified());
+        assertTrue(updated.getTimestampVerified().after(created.getTimestampVerified()));
+    }
+
+    private String createUserIdentity() throws NextStepClientException {
+        final String userId = UUID.randomUUID().toString();
+        final CreateUserRequest createUserRequest = new CreateUserRequest();
+        createUserRequest.setUserId(userId);
+        nextStepClient.createUser(createUserRequest).getResponseObject();
+        return userId;
+    }
+
+    private CreateUserContactResponse createContact(final String userId, final String value, final ContactVerificationMethod method) throws NextStepClientException {
+        final CreateUserContactRequest request = new CreateUserContactRequest();
+        request.setUserId(userId);
+        request.setContactName("TEST_CONTACT");
+        request.setContactType(ContactType.EMAIL);
+        request.setContactValue(value);
+        request.setPrimary(true);
+        request.setVerificationMethod(method);
+        return nextStepClient.createUserContact(request).getResponseObject();
+    }
+
+    private UpdateUserContactResponse updateContact(final String userId, final String value, final ContactVerificationMethod method) throws NextStepClientException {
+        final UpdateUserContactRequest request = new UpdateUserContactRequest();
+        request.setUserId(userId);
+        request.setContactName("TEST_CONTACT");
+        request.setContactType(ContactType.EMAIL);
+        request.setContactValue(value);
+        request.setPrimary(true);
+        request.setVerificationMethod(method);
+        return nextStepClient.updateUserContact(request).getResponseObject();
+    }
+
+    private UserContactDetail singleContact(final String userId) throws NextStepClientException {
+        final GetUserContactListResponse list = nextStepClient.getUserContactList(userId).getResponseObject();
+        assertEquals(1, list.getContacts().size());
+        return list.getContacts().get(0);
     }
 
     @Test
