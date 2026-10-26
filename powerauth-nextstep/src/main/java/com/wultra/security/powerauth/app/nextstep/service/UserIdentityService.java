@@ -443,13 +443,10 @@ public class UserIdentityService {
      */
     @Transactional
     public DeleteUserResponse deleteUser(DeleteUserRequest request) throws UserNotFoundException {
-        // Acquire the per-user lock before touching credentials and OTPs, so the lock ordering matches the contact
-        // verification flow (user lock first, then OTPs) and concurrent operations cannot deadlock.
-        UserIdentityEntity user = userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
-                new UserNotFoundException("User identity not found: " + request.getUserId()));
-        if (user.getStatus() == UserIdentityStatus.REMOVED) {
-            throw new UserNotFoundException("User identity is REMOVED: " + request.getUserId());
-        }
+        // Take the per-user lock first, consistently with contact verification, to avoid deadlocks
+        userIdentityRepository.findAndLockByUserId(request.getUserId());
+        final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
+        UserIdentityEntity user = userIdentityLookupService.findUser(request.getUserId());
         user.setStatus(UserIdentityStatus.REMOVED);
         user.setTimestampLastUpdated(new Date());
         removeAllCredentials(user);
@@ -615,7 +612,6 @@ public class UserIdentityService {
      */
     private List<UserContactDetail> updateContacts(UserIdentityEntity user, List<UserContactDetail> contacts) {
         final UserContactService userContactService = serviceCatalogue.getUserContactService();
-        final ContactVerificationService contactVerificationService = serviceCatalogue.getContactVerificationService();
         final List<UserContactDetail> contactListResponse = new ArrayList<>();
         final Set<UserContactEntity> existingContacts = user.getContacts();
         final Map<String, UserContactEntity> existingContactMap = new HashMap<>();
@@ -623,8 +619,6 @@ public class UserIdentityService {
         // Persist new or update existing contacts
         for (UserContactDetail contactToAdd : contacts) {
             UserContactEntity userContact = existingContactMap.get(contactToAdd.getContactName());
-            String oldValue = null;
-            ContactType oldType = null;
             if (userContact == null) {
                 userContact = new UserContactEntity();
                 userContact.setName(contactToAdd.getContactName());
@@ -633,42 +627,37 @@ public class UserIdentityService {
                 user.getContacts().add(userContact);
             } else {
                 userContact.setTimestampLastUpdated(new Date());
-                oldValue = userContact.getValue();
-                oldType = userContact.getType();
+            }
+            if (userContact.getValue() != null && (!userContact.getValue().equals(contactToAdd.getContactValue()) || userContact.getType() != contactToAdd.getContactType())) {
+                // A changed contact is no longer verified and its pending verifications are invalidated
+                serviceCatalogue.getContactVerificationService().invalidatePendingVerifications(userContact);
+                userContact.setVerificationMethod(null);
+                userContact.setTimestampVerified(null);
             }
             userContact.setType(contactToAdd.getContactType());
             userContact.setValue(contactToAdd.getContactValue());
             userContact.setPrimary(contactToAdd.isPrimary());
-            if (oldType != null && (!Objects.equals(oldValue, userContact.getValue()) || !oldType.equals(userContact.getType()))) {
-                // Changed binding: invalidate pending OTPs for the old value/type and reset verification.
-                invalidate(contactVerificationService, user.getUserId(), userContact.getName(), oldType, oldValue);
-                userContact.setVerificationMethod(null);
-                userContact.setTimestampVerified(null);
-            }
-            final UserContactDetail contactDetail = userContactConverter.fromEntity(userContact);
+            final UserContactDetail contactDetail = new UserContactDetail();
+            contactDetail.setContactName(userContact.getName());
+            contactDetail.setContactType(userContact.getType());
+            contactDetail.setContactValue(userContact.getValue());
+            contactDetail.setPrimary(userContact.isPrimary());
+            contactDetail.setTimestampCreated(userContact.getTimestampCreated());
+            contactDetail.setTimestampLastUpdated(userContact.getTimestampLastUpdated());
+            contactDetail.setVerificationMethod(userContact.getVerificationMethod());
+            contactDetail.setTimestampVerified(userContact.getTimestampVerified());
             contactListResponse.add(contactDetail);
         }
         // Remove obsolete contacts
         existingContactMap.forEach((contactName, contactEntity) -> {
             if (contacts.stream().noneMatch(c -> c.getContactName().equals(contactName))) {
-                invalidate(contactVerificationService, user.getUserId(), contactEntity.getName(), contactEntity.getType(), contactEntity.getValue());
+                serviceCatalogue.getContactVerificationService().invalidatePendingVerifications(contactEntity);
                 user.getContacts().remove(contactEntity);
             }
         });
         // Ensure primary contacts are unique
         userContactService.ensurePrimaryContactsAreUnique(user);
         return contactListResponse;
-    }
-
-    /**
-     * Invalidate pending contact verifications, converting checked failures into a rollback-forcing runtime exception.
-     */
-    private void invalidate(ContactVerificationService svc, String userId, String name, ContactType type, String value) {
-        try {
-            svc.invalidatePendingContactVerifications(userId, name, type, value);
-        } catch (OtpNotFoundException | OperationNotFoundException | InvalidRequestException ex) {
-            throw new IllegalStateException("Failed to invalidate pending contact verifications for user ID: " + userId, ex);
-        }
     }
 
     /**

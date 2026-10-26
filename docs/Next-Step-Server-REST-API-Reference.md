@@ -6011,7 +6011,7 @@ The list of expected status codes:
 
 Create a user identity.
 
-Contacts supplied here are always created as unverified; a contact's `verificationMethod` cannot be asserted through this endpoint - use `POST /user/contact`, `POST /user/contact/update`, or the contact verification flow for that.
+
 
 <!-- begin remove -->
 <table>
@@ -6234,7 +6234,7 @@ The list of expected status codes:
 
 Update a user identity.
 
-Contacts supplied here are always created or updated as unverified; a contact's `verificationMethod` cannot be asserted through this endpoint (any supplied value is ignored) - use `POST /user/contact`, `POST /user/contact/update`, or the contact verification flow for that. For an existing contact, when both its value and type are unchanged the existing verification (`verificationMethod` and `timestampVerified`) is preserved; when either the value or the type changes, the verification is reset (both fields become `null`) and any pending contact-verification OTP bound to the previous value is invalidated.
+
 
 This method has a `POST /user/update` alternative.
 
@@ -6973,15 +6973,7 @@ The list of expected status codes:
 
 Update a user contact.
 
-The optional `verificationMethod` field (`OTP`, `DEEPLINK` or `MANUAL`) controls the verification state, which is updated according to the following rules:
-
-- Contact value **unchanged**, `verificationMethod` omitted: the existing verification is preserved.
-- Contact value **unchanged**, `verificationMethod` equal to the stored method: idempotent, the stored `timestampVerified` is preserved.
-- Contact value **unchanged**, `verificationMethod` is a different non-null method: the method is updated and `timestampVerified` is set to the current server time.
-- Contact value **changed**, `verificationMethod` omitted: the verification is reset (both `verificationMethod` and `timestampVerified` become `null`).
-- Contact value **changed**, `verificationMethod` present: the method is recorded and `timestampVerified` is set to the current server time.
-
-`timestampVerified` is always server-generated and is never taken from the request. There is no way to explicitly unverify a contact without changing its value.
+The optional `verificationMethod` field (`OTP`, `DEEPLINK` or `MANUAL`) asserts that the new contact value was verified. When the contact value changes and `verificationMethod` is omitted, the verification is reset (both `verificationMethod` and `timestampVerified` become `null`). `timestampVerified` is always server-generated.
 
 This method has a `POST /user/contact/update` alternative.
 
@@ -7125,11 +7117,11 @@ The list of expected status codes:
 
 Start verification of a user contact by issuing a one-time password. The OTP value (for the `OTP` method) or the deeplink URL (for the `DEEPLINK` method) is returned in the response; Next Step does **not** deliver it. The caller is responsible for delivering the OTP value or deeplink URL to the contact through its own channel and message template.
 
-The `method` must be either `OTP` or `DEEPLINK` (`MANUAL` cannot be started). The referenced OTP definition (`otpDefinitionName`) **must use a random generation algorithm** (`OTP_RANDOM_DIGIT_GROUPS`); a definition using `OTP_DATA_DIGEST` is rejected with `INVALID_CONFIGURATION`, because its value would be a predictable digest of the internal binding data. The OTP policy **must also define a finite attempt limit** (`attemptLimit`); a definition whose policy has no attempt limit is rejected with `INVALID_CONFIGURATION`, because the contact-verification flow relies on the attempt limit to prevent brute-force guessing of the OTP value. The OTP policy **must also define a finite expiration time** (`expirationTime`); a definition whose policy has no expiration time is rejected with `INVALID_CONFIGURATION`, because an unexpiring verification OTP would remain valid indefinitely. The OTP definition **must not be data adapter proxy enabled** (`dataAdapterProxyEnabled`); a proxy-enabled definition is rejected with `INVALID_CONFIGURATION`, because this flow issues operation-less OTPs that the data adapter proxy branch cannot process. The OTP is operation-less and bound to the user and the current contact value; the `expiresAt` timestamp and the number of allowed attempts follow the OTP policy of the definition. Starting a new verification removes any earlier active verification for the same contact.
+The `method` must be either `OTP` or `DEEPLINK`. The referenced OTP definition (`otpDefinitionName`) must use a random generation algorithm (`OTP_RANDOM_DIGIT_GROUPS`).
 
-For the `DEEPLINK` method, `deeplinkBaseUrl` is required. The base URL is validated: it must be an absolute, parseable URI; the dangerous schemes `javascript`, `data`, `file` and `vbscript` are always rejected. Any other scheme (including custom mobile deeplink schemes such as `myapp://` and `https`/`http` app/universal links) is accepted. Optional allow-lists `powerauth.nextstep.contact-verification.allowed-url-schemes` (restricts the scheme when set) and `powerauth.nextstep.contact-verification.allowed-url-hosts` (restricts the host of `http`/`https` URLs when set) further constrain the URL. When a `messageTemplate` (a deeplink URL template containing a `{token}` placeholder) is supplied, the token is substituted into it; otherwise the token is appended to the base URL as a `token` query parameter. The resulting URL is validated either way.
+For the `DEEPLINK` method, `deeplinkBaseUrl` is required and must be an absolute URI without a fragment. The OTP value is appended to it as the `token` query parameter.
 
-**Residual risk:** a custom-scheme deeplink can be claimed by another application installed on the device, and the token can be intercepted in transit. Operators must size the OTP length appropriately and treat the delivery channel as untrusted.
+
 
 <!-- begin remove -->
 <table>
@@ -7153,7 +7145,7 @@ The list of expected status codes:
 | 400  | `USER_IDENTITY_NOT_FOUND` - user identity with identifier specified in the request was not found |
 | 400  | `USER_CONTACT_NOT_FOUND` - user contact was not found |
 | 400  | `INVALID_REQUEST` - the method is not `OTP`/`DEEPLINK` or the deeplink base URL is invalid |
-| 400  | `INVALID_CONFIGURATION` - the OTP definition does not use a random generation algorithm, its OTP policy does not define an attempt limit or an expiration time, or the definition is data adapter proxy enabled |
+| 400  | `INVALID_CONFIGURATION` - the OTP definition uses the `OTP_DATA_DIGEST` algorithm, has no attempt limit or expiration time, or is data adapter proxy enabled |
 | 400  | `OTP_DEFINITION_NOT_FOUND` - the OTP definition was not found |
 | 500  | Server error - unexpected error occurred |
 
@@ -7170,9 +7162,7 @@ The list of expected status codes:
     "contactType": "PHONE",
     "method": "OTP",
     "otpDefinitionName": "CONTACT_VERIFICATION",
-    "deeplinkBaseUrl": null,
-    "messageTemplate": null,
-    "language": "en"
+    "deeplinkBaseUrl": null
   }
 }
 ```
@@ -7202,9 +7192,9 @@ The list of expected status codes:
 <!-- begin api POST /user/contact/verification/confirm -->
 ### Confirm Verification of a User Contact
 
-Confirm verification of a user contact. The caller supplies the `otpValue` entered by the user (for the `OTP` method) or the `token` extracted from the deeplink (for the `DEEPLINK` method); the service verifies whichever value is present against the OTP identified by `verificationId`.
+Confirm verification of a user contact. The caller supplies the `otpValue` (for the `OTP` method) or the `token` extracted from the deeplink (for the `DEEPLINK` method). On success the contact's `verificationMethod` is set to the confirmed method and `timestampVerified` to the current server time. A wrong or unknown OTP returns `verified: false`.
 
-Verification fails generically (`verified: false`, without revealing the cause) when the OTP is unknown, expired, blocked, already used, bound to a different user, or when the contact value changed since the verification was started. An unknown user or contact, or a removed user, also returns `verified: false` without revealing the cause, exactly like a wrong OTP. The attempt limit from the OTP policy is enforced: once it is reached, the OTP is invalidated and cannot be retried. On success the contact's `verificationMethod` is set to the confirmed method (overwriting a previous `MANUAL` verification) and `timestampVerified` is set to the current server time. The verification method (`OTP` or `DEEPLINK`) is persisted on the OTP when the verification is started and read authoritatively at confirmation; the supplied credential must match it: a verification started as `OTP` must be confirmed with `otpValue`, and one started as `DEEPLINK` with `token`. A mismatched or missing credential fails generically, and an OTP not issued by the verification flow cannot be confirmed here.
+
 
 <!-- begin remove -->
 <table>

@@ -525,7 +525,7 @@ public class UserController {
      */
     @Operation(summary = "Confirm verification of a user contact")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Contact verification was processed; 'verified' is false without revealing the cause when the user or contact is unknown or removed, or the OTP is wrong"),
+            @ApiResponse(responseCode = "200", description = "Contact verification was processed; 'verified' is false when the OTP is wrong or unknown"),
             @ApiResponse(responseCode = "400", description = "Invalid request, error codes: REQUEST_VALIDATION_FAILED, INVALID_REQUEST, INVALID_CONFIGURATION"),
             @ApiResponse(responseCode = "500", description = "Unexpected error")
     })

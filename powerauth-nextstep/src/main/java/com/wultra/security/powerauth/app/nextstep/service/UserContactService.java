@@ -28,10 +28,6 @@ import com.wultra.security.powerauth.app.nextstep.service.catalogue.ServiceCatal
 import com.wultra.security.powerauth.lib.nextstep.model.entity.UserContactDetail;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
-import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.UserIdentityStatus;
-import com.wultra.security.powerauth.lib.nextstep.model.exception.InvalidRequestException;
-import com.wultra.security.powerauth.lib.nextstep.model.exception.OperationNotFoundException;
-import com.wultra.security.powerauth.lib.nextstep.model.exception.OtpNotFoundException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserContactAlreadyExistsException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserContactNotFoundException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserNotFoundException;
@@ -70,7 +66,6 @@ public class UserContactService {
 
     private final UserIdentityRepository userIdentityRepository;
     private final ServiceCatalogue serviceCatalogue;
-    private final ContactVerificationService contactVerificationService;
     private final Audit audit;
 
     private final UserContactConverter userContactConverter = new UserContactConverter();
@@ -79,15 +74,12 @@ public class UserContactService {
      * User contact service constructor.
      * @param repositoryCatalogue Repository catalogue.
      * @param serviceCatalogue Service catalogue.
-     * @param contactVerificationService Contact verification service.
      * @param audit Audit interface.
      */
     @Autowired
-    public UserContactService(RepositoryCatalogue repositoryCatalogue, @Lazy ServiceCatalogue serviceCatalogue,
-                              @Lazy ContactVerificationService contactVerificationService, Audit audit) {
+    public UserContactService(RepositoryCatalogue repositoryCatalogue, @Lazy ServiceCatalogue serviceCatalogue, Audit audit) {
         this.serviceCatalogue = serviceCatalogue;
         this.userIdentityRepository = repositoryCatalogue.getUserIdentityRepository();
-        this.contactVerificationService = contactVerificationService;
         this.audit = audit;
     }
 
@@ -100,12 +92,10 @@ public class UserContactService {
      */
     @Transactional
     public CreateUserContactResponse createUserContact(CreateUserContactRequest request) throws UserNotFoundException, UserContactAlreadyExistsException {
-        // Serialize contact creation with verification and other contact updates for this user.
-        UserIdentityEntity user = userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
-                new UserNotFoundException("User identity not found: " + request.getUserId()));
-        if (user.getStatus() == UserIdentityStatus.REMOVED) {
-            throw new UserNotFoundException("User identity is REMOVED: " + request.getUserId());
-        }
+        // Serialize with contact verification and other contact changes of the same user
+        userIdentityRepository.findAndLockByUserId(request.getUserId());
+        final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
+        UserIdentityEntity user = userIdentityLookupService.findUser(request.getUserId());
         final Set<UserContactEntity> contacts = user.getContacts();
         final Optional<UserContactEntity> contactOptional = contacts.stream().filter(c -> c.getName().equals(request.getContactName()) && c.getType().equals(request.getContactType())).findFirst();
         if (contactOptional.isPresent()) {
@@ -118,9 +108,8 @@ public class UserContactService {
         contact.setValue(request.getContactValue());
         contact.setPrimary(request.isPrimary());
         contact.setTimestampCreated(new Date());
-        final ContactVerificationMethod verificationMethod = request.getVerificationMethod();
-        if (verificationMethod != null) {
-            contact.setVerificationMethod(verificationMethod);
+        if (request.getVerificationMethod() != null) {
+            contact.setVerificationMethod(request.getVerificationMethod());
             contact.setTimestampVerified(new Date());
         }
         user.getContacts().add(contact);
@@ -132,7 +121,6 @@ public class UserContactService {
                 .type(AUDIT_TYPE_USER_IDENTITY)
                 .param("userId", user.getUserId())
                 .param("contactName", contact.getName())
-                .param("verificationMethod", contact.getVerificationMethod())
                 .build());
         final CreateUserContactResponse response = new CreateUserContactResponse();
         response.setUserId(user.getUserId());
@@ -174,55 +162,35 @@ public class UserContactService {
      */
     @Transactional
     public UpdateUserContactResponse updateUserContact(UpdateUserContactRequest request) throws UserNotFoundException, UserContactNotFoundException {
-        // Acquire a pessimistic write lock on the user identity so contact value updates serialize against contact
-        // verification start/confirm for the same user (preventing a stale value or a revived OTP across concurrent flows).
-        UserIdentityEntity user = userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
-                new UserNotFoundException("User identity not found: " + request.getUserId()));
-        if (user.getStatus() == UserIdentityStatus.REMOVED) {
-            throw new UserNotFoundException("User identity is REMOVED: " + request.getUserId());
-        }
+        // Serialize with contact verification and other contact changes of the same user
+        userIdentityRepository.findAndLockByUserId(request.getUserId());
+        final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
+        UserIdentityEntity user = userIdentityLookupService.findUser(request.getUserId());
         Set<UserContactEntity> contacts = user.getContacts();
         Optional<UserContactEntity> contactOptional = contacts.stream().filter(c -> c.getName().equals(request.getContactName()) && c.getType().equals(request.getContactType())).findFirst();
         if (contactOptional.isEmpty()) {
             throw new UserContactNotFoundException("User contact not found: " + request.getContactName() + ", user ID: " + user.getUserId() + ", type: " + request.getContactType());
         }
         final UserContactEntity contact = contactOptional.get();
-        final String oldValue = contact.getValue();
         final boolean valueChanged = !Objects.equals(contact.getValue(), request.getContactValue());
-        final ContactVerificationMethod requestedMethod = request.getVerificationMethod();
-        boolean verificationReset = false;
+        if (valueChanged) {
+            // Invalidate pending verifications of the old value so they cannot be revived by changing the value back
+            serviceCatalogue.getContactVerificationService().invalidatePendingVerifications(contact);
+        }
         contact.setUser(user);
         contact.setName(request.getContactName());
         contact.setType(request.getContactType());
         contact.setValue(request.getContactValue());
         contact.setPrimary(request.isPrimary());
         contact.setTimestampLastUpdated(new Date());
-        if (valueChanged) {
-            // Invalidate any pending verification OTPs bound to the old value, under the same lock, so a later change
-            // back to the old value cannot revive a stale OTP (the binding hash is value-specific).
-            try {
-                contactVerificationService.invalidatePendingContactVerifications(user.getUserId(), contact.getName(), contact.getType(), oldValue);
-            } catch (OtpNotFoundException | OperationNotFoundException | InvalidRequestException ex) {
-                // Active verification OTPs were just located in this transaction; a failure to invalidate them is an
-                // internal inconsistency, so roll back rather than leave an old pending verification in place.
-                throw new IllegalStateException("Failed to invalidate pending contact verifications for user ID: " + user.getUserId(), ex);
-            }
-            if (requestedMethod == null) {
-                // New value is unverified, reset any existing verification
-                verificationReset = contact.getVerificationMethod() != null;
-                contact.setVerificationMethod(null);
-                contact.setTimestampVerified(null);
-            } else {
-                // Trusted caller verified the new value
-                contact.setVerificationMethod(requestedMethod);
-                contact.setTimestampVerified(new Date());
-            }
-        } else if (requestedMethod != null && !requestedMethod.equals(contact.getVerificationMethod())) {
-            // Value unchanged but a different verification method was asserted
-            contact.setVerificationMethod(requestedMethod);
+        // A changed value is unverified unless the caller asserts a verification method for it
+        if (request.getVerificationMethod() != null && (valueChanged || !request.getVerificationMethod().equals(contact.getVerificationMethod()))) {
+            contact.setVerificationMethod(request.getVerificationMethod());
             contact.setTimestampVerified(new Date());
+        } else if (valueChanged) {
+            contact.setVerificationMethod(null);
+            contact.setTimestampVerified(null);
         }
-        // Otherwise the existing verification is preserved (unchanged value with no or idempotent method)
         // Ensure primary contacts are unique
         ensurePrimaryContactsAreUnique(user);
         user = userIdentityRepository.save(user);
@@ -231,8 +199,6 @@ public class UserContactService {
                 .type(AUDIT_TYPE_USER_IDENTITY)
                 .param("userId", user.getUserId())
                 .param("contactName", contact.getName())
-                .param("verificationMethod", contact.getVerificationMethod())
-                .param("verificationReset", verificationReset)
                 .build());
         UpdateUserContactResponse response = new UpdateUserContactResponse();
         response.setUserId(user.getUserId());
@@ -254,23 +220,17 @@ public class UserContactService {
      */
     @Transactional
     public DeleteUserContactResponse deleteUserContact(DeleteUserContactRequest request) throws UserNotFoundException, UserContactNotFoundException {
-        UserIdentityEntity user = userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
-                new UserNotFoundException("User identity not found: " + request.getUserId()));
-        if (user.getStatus() == UserIdentityStatus.REMOVED) {
-            throw new UserNotFoundException("User identity is REMOVED: " + request.getUserId());
-        }
+        // Serialize with contact verification and other contact changes of the same user
+        userIdentityRepository.findAndLockByUserId(request.getUserId());
+        final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
+        UserIdentityEntity user = userIdentityLookupService.findUser(request.getUserId());
         Set<UserContactEntity> contacts = user.getContacts();
         Optional<UserContactEntity> contactOptional = contacts.stream().filter(c -> c.getName().equals(request.getContactName()) && c.getType().equals(request.getContactType())).findFirst();
         if (contactOptional.isEmpty()) {
             throw new UserContactNotFoundException("No user contact found: " + request.getContactName() + ", user ID: " + user.getUserId() + ", type: " + request.getContactType());
         }
         final UserContactEntity contact = contactOptional.get();
-        // Invalidate pending verifications so a delete and recreate of the same contact cannot reuse an old pending OTP.
-        try {
-            contactVerificationService.invalidatePendingContactVerifications(user.getUserId(), contact.getName(), contact.getType(), contact.getValue());
-        } catch (OtpNotFoundException | OperationNotFoundException | InvalidRequestException ex) {
-            throw new IllegalStateException("Failed to invalidate pending contact verifications for user ID: " + user.getUserId(), ex);
-        }
+        serviceCatalogue.getContactVerificationService().invalidatePendingVerifications(contact);
         user.getContacts().remove(contact);
         user = userIdentityRepository.save(user);
         logger.debug("User contact was deleted, user ID: {}, contact name: {}", user.getUserId(), contact.getName());
@@ -287,44 +247,25 @@ public class UserContactService {
     }
 
     /**
-     * Mark a user contact as verified using the given verification method. The verification timestamp is set server-side.
+     * Mark a user contact as verified using the given verification method.
      * @param userId User identity identifier.
      * @param contactName Contact name.
      * @param contactType Contact type.
      * @param method Verification method that confirmed the contact.
-     * @return Update user contact response echoing the contact state.
      * @throws UserNotFoundException Thrown when user identity is not found.
      * @throws UserContactNotFoundException Thrown when user contact is not found.
      */
     @Transactional
-    public UpdateUserContactResponse markContactVerified(String userId, String contactName, ContactType contactType, ContactVerificationMethod method) throws UserNotFoundException, UserContactNotFoundException {
-        final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
-        UserIdentityEntity user = userIdentityLookupService.findUser(userId);
-        final Set<UserContactEntity> contacts = user.getContacts();
-        final Optional<UserContactEntity> contactOptional = contacts.stream().filter(c -> c.getName().equals(contactName) && c.getType().equals(contactType)).findFirst();
-        if (contactOptional.isEmpty()) {
-            throw new UserContactNotFoundException("User contact not found: " + contactName + ", user ID: " + user.getUserId() + ", type: " + contactType);
-        }
-        final UserContactEntity contact = contactOptional.get();
+    public void markContactVerified(String userId, String contactName, ContactType contactType, ContactVerificationMethod method) throws UserNotFoundException, UserContactNotFoundException {
+        final UserIdentityEntity user = serviceCatalogue.getUserIdentityLookupService().findUser(userId);
+        final UserContactEntity contact = user.getContacts().stream()
+                .filter(c -> c.getName().equals(contactName) && c.getType().equals(contactType))
+                .findFirst()
+                .orElseThrow(() -> new UserContactNotFoundException("User contact not found: " + contactName + ", user ID: " + userId + ", type: " + contactType));
         contact.setVerificationMethod(method);
         contact.setTimestampVerified(new Date());
-        user = userIdentityRepository.save(user);
-        logger.debug("User contact was verified, user ID: {}, contact name: {}", user.getUserId(), contact.getName());
-        audit.info("User contact was verified", AuditDetail.builder()
-                .type(AUDIT_TYPE_USER_IDENTITY)
-                .param("userId", user.getUserId())
-                .param("contactName", contact.getName())
-                .param("verificationMethod", contact.getVerificationMethod())
-                .build());
-        final UpdateUserContactResponse response = new UpdateUserContactResponse();
-        response.setUserId(user.getUserId());
-        response.setContactName(contact.getName());
-        response.setContactType(contact.getType());
-        response.setContactValue(contact.getValue());
-        response.setPrimary(contact.isPrimary());
-        response.setVerificationMethod(contact.getVerificationMethod());
-        response.setTimestampVerified(contact.getTimestampVerified());
-        return response;
+        userIdentityRepository.save(user);
+        logger.debug("User contact was verified, user ID: {}, contact name: {}", userId, contactName);
     }
 
     /**

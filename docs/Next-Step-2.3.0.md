@@ -33,7 +33,3 @@ ALTER TABLE ns_user_contact ADD verification_method VARCHAR2(32 CHAR);
 ALTER TABLE ns_user_contact ADD timestamp_verified TIMESTAMP;
 ALTER TABLE ns_otp_storage ADD verification_method VARCHAR2(32 CHAR);
 ```
-
-## Behavior
-
-Creating or updating a user or its contacts now acquires a per-user lock to serialize concurrent contact changes and OTP issuance.

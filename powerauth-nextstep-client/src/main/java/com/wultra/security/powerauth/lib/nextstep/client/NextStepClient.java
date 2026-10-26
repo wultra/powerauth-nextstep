@@ -2116,29 +2116,6 @@ public class NextStepClient {
     }
 
     /**
-     * Start verification of a user contact. The OTP value or deeplink URL in the response must be delivered to the contact by the caller.
-     *
-     * @param userId User ID.
-     * @param contactName Contact name.
-     * @param contactType Contact type.
-     * @param method Verification method, either {@code OTP} or {@code DEEPLINK}.
-     * @param otpDefinitionName Name of the OTP definition used to issue the verification OTP.
-     * @return Start contact verification response.
-     * @throws NextStepClientException Thrown when REST API call fails, including {@link ErrorResponse} with error code.
-     * @see #startContactVerification(StartContactVerificationRequest)
-     */
-    public ObjectResponse<StartContactVerificationResponse> startContactVerification(@NotNull String userId, @NotNull String contactName, @NotNull ContactType contactType,
-                                                                                     @NotNull ContactVerificationMethod method, @NotNull String otpDefinitionName) throws NextStepClientException {
-        final StartContactVerificationRequest request = new StartContactVerificationRequest();
-        request.setUserId(userId);
-        request.setContactName(contactName);
-        request.setContactType(contactType);
-        request.setMethod(method);
-        request.setOtpDefinitionName(otpDefinitionName);
-        return startContactVerification(request);
-    }
-
-    /**
      * Start verification of a user contact.
      *
      * @param request Start contact verification request.
@@ -2147,31 +2124,6 @@ public class NextStepClient {
      */
     public ObjectResponse<StartContactVerificationResponse> startContactVerification(@NotNull final StartContactVerificationRequest request) throws NextStepClientException {
         return postObjectImpl("/user/contact/verification/start", new ObjectRequest<>(request), StartContactVerificationResponse.class);
-    }
-
-    /**
-     * Confirm verification of a user contact using the OTP value or deeplink token supplied by the caller.
-     *
-     * @param userId User ID.
-     * @param contactName Contact name.
-     * @param contactType Contact type.
-     * @param verificationId Verification identifier returned when the verification was started.
-     * @param otpValue OTP value for the {@code OTP} method, or {@code null}.
-     * @param token Deeplink token for the {@code DEEPLINK} method, or {@code null}.
-     * @return Confirm contact verification response.
-     * @throws NextStepClientException Thrown when REST API call fails, including {@link ErrorResponse} with error code.
-     * @see #confirmContactVerification(ConfirmContactVerificationRequest)
-     */
-    public ObjectResponse<ConfirmContactVerificationResponse> confirmContactVerification(@NotNull String userId, @NotNull String contactName, @NotNull ContactType contactType,
-                                                                                         @NotNull String verificationId, String otpValue, String token) throws NextStepClientException {
-        final ConfirmContactVerificationRequest request = new ConfirmContactVerificationRequest();
-        request.setUserId(userId);
-        request.setContactName(contactName);
-        request.setContactType(contactType);
-        request.setVerificationId(verificationId);
-        request.setOtpValue(otpValue);
-        request.setToken(token);
-        return confirmContactVerification(request);
     }
 
     /**

@@ -70,14 +70,4 @@ public class StartContactVerificationRequest {
      */
     private String deeplinkBaseUrl;
 
-    /**
-     * Optional caller-supplied deeplink URL template for the DEEPLINK method. When set it must contain a {token} placeholder; the token is substituted into the template and the resulting URL is validated. Ignored for the OTP method.
-     */
-    private String messageTemplate;
-
-    /**
-     * Optional language of the delivered message (caller responsibility).
-     */
-    private String language;
-
 }

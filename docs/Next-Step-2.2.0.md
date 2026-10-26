@@ -35,6 +35,7 @@ Added a new indexed column `subject_id` holding an identifier linking the audit 
 The auditing tables may be already updated in your database schema if the database schema is not separated for different PowerAuth applications. In case the column `audit_log.subject_id` and its index `audit_log_subject_id_idx` are already present, you can safely skip this migration step.
 <!-- end -->
 
+
 ## Dependency Updates
 
 

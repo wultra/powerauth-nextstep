@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added verification tracking (`verificationMethod`, `timestampVerified`) to user contacts [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
-- Added an OTP/deeplink contact verification flow (`POST /user/contact/verification/start` and `/confirm`) that issues a one-time password and returns it to the caller for delivery to the contact. Deeplink base URLs are validated (dangerous schemes rejected, optional host/scheme allow-lists); residual risk: custom-scheme deeplinks can be hijacked and the token intercepted in transit [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
+- Added an OTP/deeplink contact verification flow (`POST /user/contact/verification/start` and `/confirm`) [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
 
 ### Changed
 
@@ -18,8 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed OTP cleanup for Oracle databases and serialized concurrent contact creation and user create/update under a per-user lock [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
-- Rejected and invalidated pending contact-verification OTPs at confirmation if their definition uses proxy mode [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
 - Removed the `javascript` language from the CodeQL analysis workflow, as the repository contains no JS/TS source [(#60)](https://github.com/wultra/powerauth-nextstep/issues/60)
 
 ## [2.2.2] - 2026-08-27

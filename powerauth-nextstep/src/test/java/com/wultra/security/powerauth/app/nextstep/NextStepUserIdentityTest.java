@@ -284,38 +284,6 @@ class NextStepUserIdentityTest extends NextStepTest {
     }
 
     @Test
-    void testUpdateWithUnchangedValueAndNoMethodPreservesVerification() throws NextStepClientException {
-        final String userId = createUserIdentity();
-        final CreateUserContactResponse created = createContact(userId, "test@test.test", ContactVerificationMethod.OTP);
-
-        final UpdateUserContactResponse updated = updateContact(userId, "test@test.test", null);
-        assertEquals(ContactVerificationMethod.OTP, updated.getVerificationMethod());
-        assertEquals(created.getTimestampVerified(), updated.getTimestampVerified());
-    }
-
-    @Test
-    void testUpdateWithUnchangedValueAndSameMethodIsIdempotent() throws NextStepClientException {
-        final String userId = createUserIdentity();
-        final CreateUserContactResponse created = createContact(userId, "test@test.test", ContactVerificationMethod.OTP);
-
-        final UpdateUserContactResponse updated = updateContact(userId, "test@test.test", ContactVerificationMethod.OTP);
-        assertEquals(ContactVerificationMethod.OTP, updated.getVerificationMethod());
-        assertEquals(created.getTimestampVerified(), updated.getTimestampVerified());
-    }
-
-    @Test
-    void testUpdateWithUnchangedValueAndDifferentMethodReverifies() throws Exception {
-        final String userId = createUserIdentity();
-        final CreateUserContactResponse created = createContact(userId, "test@test.test", ContactVerificationMethod.MANUAL);
-        Thread.sleep(10);
-
-        final UpdateUserContactResponse updated = updateContact(userId, "test@test.test", ContactVerificationMethod.OTP);
-        assertEquals(ContactVerificationMethod.OTP, updated.getVerificationMethod());
-        assertNotNull(updated.getTimestampVerified());
-        assertTrue(updated.getTimestampVerified().after(created.getTimestampVerified()));
-    }
-
-    @Test
     void testUpdateWithChangedValueAndNoMethodResetsVerification() throws NextStepClientException {
         final String userId = createUserIdentity();
         createContact(userId, "test@test.test", ContactVerificationMethod.MANUAL);
@@ -327,19 +295,6 @@ class NextStepUserIdentityTest extends NextStepTest {
         final UserContactDetail listed = singleContact(userId);
         assertNull(listed.getVerificationMethod());
         assertNull(listed.getTimestampVerified());
-    }
-
-    @Test
-    void testUpdateWithChangedValueAndMethodVerifiesNewValue() throws Exception {
-        final String userId = createUserIdentity();
-        final CreateUserContactResponse created = createContact(userId, "test@test.test", ContactVerificationMethod.OTP);
-        Thread.sleep(10);
-
-        final UpdateUserContactResponse updated = updateContact(userId, "changed@test.test", ContactVerificationMethod.MANUAL);
-        assertEquals("changed@test.test", updated.getContactValue());
-        assertEquals(ContactVerificationMethod.MANUAL, updated.getVerificationMethod());
-        assertNotNull(updated.getTimestampVerified());
-        assertTrue(updated.getTimestampVerified().after(created.getTimestampVerified()));
     }
 
     private String createUserIdentity() throws NextStepClientException {

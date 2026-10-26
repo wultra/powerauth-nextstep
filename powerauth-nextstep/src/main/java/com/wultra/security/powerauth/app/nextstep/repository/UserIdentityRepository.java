@@ -55,8 +55,8 @@ public interface UserIdentityRepository extends CrudRepository<UserIdentityEntit
     Stream<UserIdentityEntity> findUserIdentitiesByCreatedDate(@Param("startDate") Date startDate, @Param("endDate") Date endDate);
 
     /**
-     * Find a user identity and acquire a pessimistic write lock on its row. Serializes concurrent contact
-     * verification start/confirm and contact value updates for the same user (standard SELECT ... FOR UPDATE).
+     * Find a user identity and acquire a pessimistic write lock on its row, so that concurrent contact verification
+     * and contact changes for the same user are serialized.
      * @param userId User ID.
      * @return User identity entity, if found.
      */
