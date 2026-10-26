@@ -359,34 +359,50 @@ class NextStepContactVerificationTest extends NextStepTest {
     }
 
     @Test
-    void rejectsConfirmationWhenAttemptLimitRemovedAfterStart() throws NextStepClientException {
+    void rejectsConfirmationWhenAttemptLimitWeakenedAfterStart() throws NextStepClientException {
         final String userId = createUserWithContact("user@test.test");
-        final StartContactVerificationResponse start = nextStepClient.startContactVerification(userId, CONTACT_NAME,
-                CONTACT_TYPE, ContactVerificationMethod.OTP, MUTABLE_OTP_DEFINITION).getResponseObject();
 
-        // Remove the attempt limit from the policy after the verification started. Without the confirm-time guard the
-        // outstanding OTP could then be guessed without bound; it must instead fail generically and be invalidated.
+        // Scenario 1: removing the limit (null) after start must not enable unbounded guessing.
+        final StartContactVerificationResponse removed = nextStepClient.startContactVerification(userId, CONTACT_NAME,
+                CONTACT_TYPE, ContactVerificationMethod.OTP, MUTABLE_OTP_DEFINITION).getResponseObject();
+        setMutablePolicyLimit(null);
+        final ConfirmContactVerificationResponse afterRemoval =
+                confirm(userId, CONTACT_NAME, removed.getVerificationId(), removed.getOtpValue(), null);
+        assertFalse(afterRemoval.isVerified());
+        assertNull(afterRemoval.getRemainingAttempts());
+        // The OTP is invalidated, so even the correct value cannot be retried.
+        assertEquals(OtpStatus.REMOVED, nextStepClient.getOtpDetail(removed.getVerificationId(), null)
+                .getResponseObject().getOtpDetail().getOtpStatus());
+
+        // Scenario 2: lowering the limit below the already-recorded failed attempts must also invalidate the OTP,
+        // because authentication only blocks when the remaining attempts reach exactly zero, never when negative.
+        setMutablePolicyLimit(3);
+        final StartContactVerificationResponse lowered = nextStepClient.startContactVerification(userId, CONTACT_NAME,
+                CONTACT_TYPE, ContactVerificationMethod.OTP, MUTABLE_OTP_DEFINITION).getResponseObject();
+        confirm(userId, CONTACT_NAME, lowered.getVerificationId(), "00000000", null);
+        confirm(userId, CONTACT_NAME, lowered.getVerificationId(), "00000000", null);
+        setMutablePolicyLimit(1);
+        final ConfirmContactVerificationResponse afterLowering =
+                confirm(userId, CONTACT_NAME, lowered.getVerificationId(), lowered.getOtpValue(), null);
+        assertFalse(afterLowering.isVerified());
+        assertNull(afterLowering.getRemainingAttempts());
+        assertEquals(OtpStatus.REMOVED, nextStepClient.getOtpDetail(lowered.getVerificationId(), null)
+                .getResponseObject().getOtpDetail().getOtpStatus());
+
+        // Restore a finite limit so the shared definition stays usable for any later run.
+        setMutablePolicyLimit(3);
+    }
+
+    private void setMutablePolicyLimit(final Integer attemptLimit) throws NextStepClientException {
         final UpdateOtpPolicyRequest update = new UpdateOtpPolicyRequest();
         update.setOtpPolicyName(MUTABLE_OTP_POLICY);
         update.setLength(8);
-        update.setAttemptLimit(null);
+        update.setAttemptLimit(attemptLimit);
         update.setExpirationTime(300L);
         update.setGenAlgorithm(OtpGenerationAlgorithm.OTP_RANDOM_DIGIT_GROUPS);
         final OtpGenerationParam genParam = new OtpGenerationParam();
         genParam.setGroupSize(2);
         update.setGenParam(genParam);
-        nextStepClient.updateOtpPolicy(update);
-
-        final ConfirmContactVerificationResponse confirm =
-                confirm(userId, CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null);
-        assertFalse(confirm.isVerified());
-        assertNull(confirm.getRemainingAttempts());
-        // The OTP is invalidated, so even the correct value cannot be retried.
-        assertEquals(OtpStatus.REMOVED, nextStepClient.getOtpDetail(start.getVerificationId(), null)
-                .getResponseObject().getOtpDetail().getOtpStatus());
-
-        // Restore a finite limit so the shared definition stays usable for any later run.
-        update.setAttemptLimit(3);
         nextStepClient.updateOtpPolicy(update);
     }
 

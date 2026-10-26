@@ -268,10 +268,12 @@ public class ContactVerificationService {
             return auditedFailure(request.getUserId(), contact.getName());
         }
 
-        // Re-check that the current OTP policy still defines a finite attempt limit. The definition may have been edited
-        // to remove the limit after the verification was started; without a limit an outstanding OTP could be guessed
-        // without bound until expiry, so a missing limit fails generically and the OTP is invalidated.
-        if (otp.getOtpDefinition().getOtpPolicy().getAttemptLimit() == null) {
+        // Re-check the attempt limit against the current policy before authenticating. The definition may have been
+        // edited after the verification was started: removing the limit (null) or lowering it below the already-recorded
+        // failed attempts would otherwise let the OTP be guessed further, because authentication only blocks when the
+        // remaining attempts reach exactly zero. Either case fails generically and invalidates the OTP.
+        final Integer currentAttemptLimit = otp.getOtpDefinition().getOtpPolicy().getAttemptLimit();
+        if (currentAttemptLimit == null || otp.getFailedAttemptCounter() >= currentAttemptLimit) {
             try {
                 blockOtp(otpId);
             } catch (OtpNotFoundException ex) {
