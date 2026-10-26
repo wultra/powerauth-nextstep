@@ -58,6 +58,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * This service handles verification of user contacts using an OTP or a deeplink. The OTP value or deeplink URL is returned
@@ -361,7 +362,10 @@ public class ContactVerificationService {
      * Remove earlier active verification OTPs for the same user and binding.
      */
     private void removeActiveVerifications(String userId, String bindingHash) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException {
-        final List<OtpEntity> activeOtps = otpRepository.findAllByUserIdAndOtpDataAndStatus(userId, bindingHash, OtpStatus.ACTIVE).toList();
+        final List<OtpEntity> activeOtps;
+        try (final Stream<OtpEntity> existingOtps = otpRepository.findAllByUserIdAndStatus(userId, OtpStatus.ACTIVE)) {
+            activeOtps = existingOtps.filter(otp -> bindingHash.equals(otp.getOtpData())).toList();
+        }
         for (OtpEntity activeOtp : activeOtps) {
             blockOtp(activeOtp.getOtpId());
         }

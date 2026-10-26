@@ -100,8 +100,12 @@ public class UserContactService {
      */
     @Transactional
     public CreateUserContactResponse createUserContact(CreateUserContactRequest request) throws UserNotFoundException, UserContactAlreadyExistsException {
-        final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
-        UserIdentityEntity user = userIdentityLookupService.findUser(request.getUserId());
+        // Serialize contact creation with verification and other contact updates for this user.
+        UserIdentityEntity user = userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
+                new UserNotFoundException("User identity not found: " + request.getUserId()));
+        if (user.getStatus() == UserIdentityStatus.REMOVED) {
+            throw new UserNotFoundException("User identity is REMOVED: " + request.getUserId());
+        }
         final Set<UserContactEntity> contacts = user.getContacts();
         final Optional<UserContactEntity> contactOptional = contacts.stream().filter(c -> c.getName().equals(request.getContactName()) && c.getType().equals(request.getContactType())).findFirst();
         if (contactOptional.isPresent()) {

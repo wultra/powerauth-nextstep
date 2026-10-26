@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed OTP cleanup for Oracle databases and serialized concurrent user-contact creation [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
 - Removed the `javascript` language from the CodeQL analysis workflow, as the repository contains no JS/TS source [(#60)](https://github.com/wultra/powerauth-nextstep/issues/60)
 
 ## [2.2.2] - 2026-08-27
