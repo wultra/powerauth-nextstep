@@ -188,7 +188,12 @@ public class ContactVerificationService {
     public ConfirmContactVerificationResponse confirmContactVerification(ConfirmContactVerificationRequest request) throws UserNotFoundException, UserContactNotFoundException,
             InvalidRequestException, InvalidConfigurationException, OperationNotFoundException, CredentialNotFoundException, OperationAlreadyCanceledException,
             OperationAlreadyFinishedException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
-        final UserContactEntity contact = lockAndFindContact(request.getUserId(), request.getContactName(), request.getContactType());
+        final UserContactEntity contact;
+        try {
+            contact = lockAndFindContact(request.getUserId(), request.getContactName(), request.getContactType());
+        } catch (UserNotFoundException | UserContactNotFoundException ex) {
+            return failed();
+        }
 
         // The OTP must be bound to the current user and contact value, otherwise it was issued for a different contact or value.
         final OtpEntity otp;
@@ -316,9 +321,14 @@ public class ContactVerificationService {
         }
         try {
             final URI uri = new URI(baseUrl);
-            if (uri.getScheme() == null || uri.getFragment() != null) {
+            final String scheme = uri.getScheme();
+            if (scheme == null || uri.getFragment() != null) {
                 // A fragment would swallow the appended token query parameter
                 throw new InvalidRequestException("Deeplink base URL must be an absolute URI without a fragment");
+            }
+            if (scheme.equalsIgnoreCase("javascript") || scheme.equalsIgnoreCase("data")
+                    || scheme.equalsIgnoreCase("file") || scheme.equalsIgnoreCase("vbscript")) {
+                throw new InvalidRequestException("Deeplink base URL must not use an executable scheme");
             }
         } catch (URISyntaxException ex) {
             throw new InvalidRequestException("Deeplink base URL is not a valid URI");

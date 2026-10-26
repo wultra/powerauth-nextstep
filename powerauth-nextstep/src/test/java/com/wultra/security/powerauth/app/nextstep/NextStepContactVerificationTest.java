@@ -28,6 +28,8 @@ import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpDefinit
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpPolicyRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateUserRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.StartContactVerificationRequest;
+import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateOtpDefinitionRequest;
+import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateOtpPolicyRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.response.ConfirmContactVerificationResponse;
 import com.wultra.security.powerauth.lib.nextstep.model.response.StartContactVerificationResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -131,6 +133,77 @@ class NextStepContactVerificationTest extends NextStepTest {
         assertThrows(NextStepClientException.class, () -> start(userId, ContactVerificationMethod.DEEPLINK, "not-absolute", OTP_DEFINITION));
     }
 
+    @Test
+    void rejectsDangerousDeeplinkSchemesAndAllowsCustomSchemes() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+
+        assertThrows(NextStepClientException.class, () -> start(userId, ContactVerificationMethod.DEEPLINK, "JaVaScRiPt:alert(1)//", OTP_DEFINITION));
+        assertThrows(NextStepClientException.class, () -> start(userId, ContactVerificationMethod.DEEPLINK, "data:text/html,hello", OTP_DEFINITION));
+        assertThrows(NextStepClientException.class, () -> start(userId, ContactVerificationMethod.DEEPLINK, "file:///tmp/verify", OTP_DEFINITION));
+        assertThrows(NextStepClientException.class, () -> start(userId, ContactVerificationMethod.DEEPLINK, "vbscript:msgbox(1)", OTP_DEFINITION));
+        assertTrue(start(userId, ContactVerificationMethod.DEEPLINK, "myapp://verify", OTP_DEFINITION).getDeeplinkUrl().startsWith("myapp://verify?token="));
+    }
+
+    @Test
+    void returnsFailedForMissingUserOrContact() throws NextStepClientException {
+        final String userWithContact = createUserWithContact("contact@test.test");
+        final StartContactVerificationResponse contactVerification = start(userWithContact, ContactVerificationMethod.OTP, null, OTP_DEFINITION);
+        nextStepClient.deleteUserContact(userWithContact, CONTACT_NAME, CONTACT_TYPE);
+        assertFalse(confirm(userWithContact, contactVerification.getVerificationId(), contactVerification.getOtpValue(), null).isVerified());
+
+        final String deletedUser = createUserWithContact("deleted@test.test");
+        final StartContactVerificationResponse userVerification = start(deletedUser, ContactVerificationMethod.OTP, null, OTP_DEFINITION);
+        nextStepClient.deleteUser(deletedUser);
+        assertFalse(confirm(deletedUser, userVerification.getVerificationId(), userVerification.getOtpValue(), null).isVerified());
+    }
+
+    @Test
+    void rejectsConfirmationAndInvalidatesOtpWhenAttemptLimitIsRemoved() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = start(userId, ContactVerificationMethod.OTP, null, OTP_DEFINITION);
+
+        try {
+            updateAttemptLimit(null);
+            assertFalse(confirm(userId, start.getVerificationId(), start.getOtpValue(), null).isVerified());
+        } finally {
+            updateAttemptLimit(3);
+        }
+
+        assertFalse(confirm(userId, start.getVerificationId(), start.getOtpValue(), null).isVerified());
+    }
+
+    @Test
+    void rejectsConfirmationAndInvalidatesOtpWhenAttemptLimitIsLowered() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = start(userId, ContactVerificationMethod.OTP, null, OTP_DEFINITION);
+        confirm(userId, start.getVerificationId(), "00000000", null);
+        confirm(userId, start.getVerificationId(), "00000000", null);
+
+        try {
+            updateAttemptLimit(1);
+            assertFalse(confirm(userId, start.getVerificationId(), start.getOtpValue(), null).isVerified());
+        } finally {
+            updateAttemptLimit(3);
+        }
+
+        assertFalse(confirm(userId, start.getVerificationId(), start.getOtpValue(), null).isVerified());
+    }
+
+    @Test
+    void rejectsConfirmationAndInvalidatesOtpWhenProxyModeIsEnabled() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = start(userId, ContactVerificationMethod.OTP, null, OTP_DEFINITION);
+
+        try {
+            updateProxyMode(true);
+            assertFalse(confirm(userId, start.getVerificationId(), start.getOtpValue(), null).isVerified());
+        } finally {
+            updateProxyMode(false);
+        }
+
+        assertFalse(confirm(userId, start.getVerificationId(), start.getOtpValue(), null).isVerified());
+    }
+
     private StartContactVerificationResponse start(final String userId, final ContactVerificationMethod method, final String baseUrl,
                                                    final String otpDefinitionName) throws NextStepClientException {
         final StartContactVerificationRequest request = new StartContactVerificationRequest();
@@ -191,6 +264,28 @@ class NextStepContactVerificationTest extends NextStepTest {
         } catch (NextStepClientException ex) {
             // Already provisioned by an earlier test in the shared Spring context.
         }
+    }
+
+    private void updateAttemptLimit(Integer attemptLimit) throws NextStepClientException {
+        final UpdateOtpPolicyRequest policy = new UpdateOtpPolicyRequest();
+        policy.setOtpPolicyName("CONTACT_VERIFICATION_OTP_POLICY");
+        policy.setLength(8);
+        policy.setAttemptLimit(attemptLimit);
+        policy.setExpirationTime(300L);
+        policy.setGenAlgorithm(OtpGenerationAlgorithm.OTP_RANDOM_DIGIT_GROUPS);
+        final OtpGenerationParam genParam = new OtpGenerationParam();
+        genParam.setGroupSize(2);
+        policy.setGenParam(genParam);
+        nextStepClient.updateOtpPolicy(policy);
+    }
+
+    private void updateProxyMode(boolean enabled) throws NextStepClientException {
+        final UpdateOtpDefinitionRequest definition = new UpdateOtpDefinitionRequest();
+        definition.setOtpDefinitionName(OTP_DEFINITION);
+        definition.setApplicationName("TEST_APP");
+        definition.setOtpPolicyName("CONTACT_VERIFICATION_OTP_POLICY");
+        definition.setDataAdapterProxyEnabled(enabled);
+        nextStepClient.updateOtpDefinition(definition);
     }
 
 }
