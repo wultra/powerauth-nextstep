@@ -35,33 +35,6 @@ Added a new indexed column `subject_id` holding an identifier linking the audit 
 The auditing tables may be already updated in your database schema if the database schema is not separated for different PowerAuth applications. In case the column `audit_log.subject_id` and its index `audit_log_subject_id_idx` are already present, you can safely skip this migration step.
 <!-- end -->
 
-### `ns_user_contact` and `ns_otp_storage` Tables (since 2.2.3)
-
-A new Liquibase changeset adds three nullable columns to support contact verification. All three are nullable with no default value; existing rows remain unverified (`null`) and no data backfill is required.
-
-- `ns_user_contact.verification_method` (`varchar(32)`) – verification method that confirmed the contact.
-- `ns_user_contact.timestamp_verified` (`timestamp`) – time at which the contact was verified.
-- `ns_otp_storage.verification_method` (`varchar(32)`) – verification method the OTP was issued for.
-
-For operators applying the change manually (without Liquibase), run the following statements.
-
-PostgreSQL:
-
-```sql
-ALTER TABLE ns_user_contact ADD verification_method VARCHAR(32);
-ALTER TABLE ns_user_contact ADD timestamp_verified TIMESTAMP;
-ALTER TABLE ns_otp_storage ADD verification_method VARCHAR(32);
-```
-
-Oracle:
-
-```sql
-ALTER TABLE ns_user_contact ADD verification_method VARCHAR2(32 CHAR);
-ALTER TABLE ns_user_contact ADD timestamp_verified TIMESTAMP;
-ALTER TABLE ns_otp_storage ADD verification_method VARCHAR2(32 CHAR);
-```
-
-
 ## Dependency Updates
 
 

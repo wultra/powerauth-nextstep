@@ -1,6 +1,6 @@
 /*
  * PowerAuth Web Flow and related software components
- * Copyright (C) 2025 Wultra s.r.o.
+ * Copyright (C) 2026 Wultra s.r.o.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
@@ -20,6 +20,7 @@ package com.wultra.security.powerauth.lib.nextstep.model.response;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
 import lombok.Data;
+import lombok.ToString;
 
 import java.util.Date;
 
@@ -65,11 +66,13 @@ public class StartContactVerificationResponse {
     /**
      * Generated OTP value to be delivered to the contact. Set only for the {@code OTP} method.
      */
+    @ToString.Exclude
     private String otpValue;
 
     /**
      * Deeplink URL to be delivered to the contact. Set only for the {@code DEEPLINK} method.
      */
+    @ToString.Exclude
     private String deeplinkUrl;
 
 }

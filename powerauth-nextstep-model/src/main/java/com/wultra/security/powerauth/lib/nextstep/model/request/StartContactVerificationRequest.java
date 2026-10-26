@@ -1,6 +1,6 @@
 /*
  * PowerAuth Web Flow and related software components
- * Copyright (C) 2025 Wultra s.r.o.
+ * Copyright (C) 2026 Wultra s.r.o.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
@@ -71,7 +71,7 @@ public class StartContactVerificationRequest {
     private String deeplinkBaseUrl;
 
     /**
-     * Optional caller-owned message template containing a {@code {token}} placeholder for the {@code DEEPLINK} method.
+     * Optional caller-supplied deeplink URL template for the DEEPLINK method. When set it must contain a {token} placeholder; the token is substituted into the template and the resulting URL is validated. Ignored for the OTP method.
      */
     private String messageTemplate;
 

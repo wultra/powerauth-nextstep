@@ -443,8 +443,13 @@ public class UserIdentityService {
      */
     @Transactional
     public DeleteUserResponse deleteUser(DeleteUserRequest request) throws UserNotFoundException {
-        final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
-        UserIdentityEntity user = userIdentityLookupService.findUser(request.getUserId());
+        // Acquire the per-user lock before touching credentials and OTPs, so the lock ordering matches the contact
+        // verification flow (user lock first, then OTPs) and concurrent operations cannot deadlock.
+        UserIdentityEntity user = userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
+                new UserNotFoundException("User identity not found: " + request.getUserId()));
+        if (user.getStatus() == UserIdentityStatus.REMOVED) {
+            throw new UserNotFoundException("User identity is REMOVED: " + request.getUserId());
+        }
         user.setStatus(UserIdentityStatus.REMOVED);
         user.setTimestampLastUpdated(new Date());
         removeAllCredentials(user);

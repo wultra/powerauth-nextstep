@@ -3,7 +3,7 @@
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
 
-    <changeSet id="1" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.2.x/20261026-add-contact-verification.xml">
+    <changeSet id="1" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="ns_user_contact" columnName="verification_method"/>
@@ -18,7 +18,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="2" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.2.x/20261026-add-contact-verification.xml">
+    <changeSet id="2" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="ns_user_contact" columnName="timestamp_verified"/>
@@ -33,7 +33,7 @@
         </rollback>
     </changeSet>
 
-    <changeSet id="3" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.2.x/20261026-add-contact-verification.xml">
+    <changeSet id="3" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
         <preConditions onFail="MARK_RAN">
             <not>
                 <columnExists tableName="ns_otp_storage" columnName="verification_method"/>

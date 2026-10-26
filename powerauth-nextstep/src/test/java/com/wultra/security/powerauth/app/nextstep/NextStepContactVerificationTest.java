@@ -1,6 +1,6 @@
 /*
  * PowerAuth Web Flow and related software components
- * Copyright (C) 2025 Wultra s.r.o.
+ * Copyright (C) 2026 Wultra s.r.o.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
@@ -23,6 +23,7 @@ import com.wultra.security.powerauth.lib.nextstep.model.entity.OtpGenerationPara
 import com.wultra.security.powerauth.lib.nextstep.model.entity.UserContactDetail;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpStatus;
 import com.wultra.security.powerauth.lib.nextstep.model.enumeration.OtpGenerationAlgorithm;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.InvalidConfigurationException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.InvalidRequestException;
@@ -31,6 +32,7 @@ import com.wultra.security.powerauth.lib.nextstep.model.exception.UserNotFoundEx
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpDefinitionRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpPolicyRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateUserRequest;
+import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateOtpPolicyRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateUserRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.response.ConfirmContactVerificationResponse;
 import com.wultra.security.powerauth.lib.nextstep.model.response.StartContactVerificationResponse;
@@ -57,6 +59,8 @@ class NextStepContactVerificationTest extends NextStepTest {
     private static final String NO_LIMIT_OTP_DEFINITION = "CONTACT_VERIFICATION_NO_LIMIT_OTP";
     private static final String NO_EXPIRY_OTP_DEFINITION = "CONTACT_VERIFICATION_NO_EXPIRY_OTP";
     private static final String EXPIRING_OTP_DEFINITION = "CONTACT_VERIFICATION_EXPIRING_OTP";
+    private static final String MUTABLE_OTP_DEFINITION = "CONTACT_VERIFICATION_MUTABLE_OTP";
+    private static final String MUTABLE_OTP_POLICY = "CONTACT_VERIFICATION_MUTABLE_POLICY";
     private static final String CONTACT_NAME = "TEST_CONTACT";
     private static final ContactType CONTACT_TYPE = ContactType.EMAIL;
 
@@ -113,8 +117,7 @@ class NextStepContactVerificationTest extends NextStepTest {
                 confirm(userId, CONTACT_NAME, start.getVerificationId(), "00000000", null);
 
         assertFalse(confirm.isVerified());
-        assertNotNull(confirm.getRemainingAttempts());
-        assertTrue(confirm.getRemainingAttempts() < 3);
+        assertNull(confirm.getRemainingAttempts());
         assertNull(singleContact(userId).getVerificationMethod());
     }
 
@@ -273,6 +276,12 @@ class NextStepContactVerificationTest extends NextStepTest {
         final com.wultra.security.powerauth.lib.nextstep.model.response.CreateOtpResponse plainOtp =
                 nextStepClient.createOtp(userId, "TEST_OTP", null, bindingHash).getResponseObject();
 
+        // Starting a contact verification triggers cleanup of OTPs bound to this contact. The plain OTP shares the
+        // binding hash but is not a contact-verification OTP (no verification method), so cleanup must leave it ACTIVE.
+        startOtp(userId);
+        assertEquals(OtpStatus.ACTIVE, nextStepClient.getOtpDetail(plainOtp.getOtpId(), null)
+                .getResponseObject().getOtpDetail().getOtpStatus());
+
         final ConfirmContactVerificationResponse confirm =
                 confirm(userId, CONTACT_NAME, plainOtp.getOtpId(), plainOtp.getOtpValue(), null);
 
@@ -347,6 +356,38 @@ class NextStepContactVerificationTest extends NextStepTest {
                 () -> nextStepClient.startContactVerification(userId, CONTACT_NAME, CONTACT_TYPE,
                         ContactVerificationMethod.OTP, NO_LIMIT_OTP_DEFINITION));
         assertEquals(InvalidConfigurationException.CODE, thrown.getError().getCode());
+    }
+
+    @Test
+    void rejectsConfirmationWhenAttemptLimitRemovedAfterStart() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = nextStepClient.startContactVerification(userId, CONTACT_NAME,
+                CONTACT_TYPE, ContactVerificationMethod.OTP, MUTABLE_OTP_DEFINITION).getResponseObject();
+
+        // Remove the attempt limit from the policy after the verification started. Without the confirm-time guard the
+        // outstanding OTP could then be guessed without bound; it must instead fail generically and be invalidated.
+        final UpdateOtpPolicyRequest update = new UpdateOtpPolicyRequest();
+        update.setOtpPolicyName(MUTABLE_OTP_POLICY);
+        update.setLength(8);
+        update.setAttemptLimit(null);
+        update.setExpirationTime(300L);
+        update.setGenAlgorithm(OtpGenerationAlgorithm.OTP_RANDOM_DIGIT_GROUPS);
+        final OtpGenerationParam genParam = new OtpGenerationParam();
+        genParam.setGroupSize(2);
+        update.setGenParam(genParam);
+        nextStepClient.updateOtpPolicy(update);
+
+        final ConfirmContactVerificationResponse confirm =
+                confirm(userId, CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null);
+        assertFalse(confirm.isVerified());
+        assertNull(confirm.getRemainingAttempts());
+        // The OTP is invalidated, so even the correct value cannot be retried.
+        assertEquals(OtpStatus.REMOVED, nextStepClient.getOtpDetail(start.getVerificationId(), null)
+                .getResponseObject().getOtpDetail().getOtpStatus());
+
+        // Restore a finite limit so the shared definition stays usable for any later run.
+        update.setAttemptLimit(3);
+        nextStepClient.updateOtpPolicy(update);
     }
 
     @Test
@@ -538,7 +579,8 @@ class NextStepContactVerificationTest extends NextStepTest {
     private String extractToken(final String url) {
         final int index = url.indexOf("token=");
         assertTrue(index >= 0);
-        return url.substring(index + "token=".length());
+        final String raw = url.substring(index + "token=".length());
+        return java.net.URLDecoder.decode(raw, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private String bindingHash(final String contactName, final ContactType contactType, final String contactValue) {
@@ -572,6 +614,8 @@ class NextStepContactVerificationTest extends NextStepTest {
         provisionOtp("CONTACT_VERIFICATION_NO_EXPIRY_POLICY", NO_EXPIRY_OTP_DEFINITION, 3, null, genParam);
         // Short-lived definition used to assert that an expired OTP cannot be confirmed.
         provisionOtp("CONTACT_VERIFICATION_EXPIRING_POLICY", EXPIRING_OTP_DEFINITION, 3, 1L, genParam);
+        // Dedicated definition whose policy is mutated by a single test; kept separate so the mutation cannot affect others.
+        provisionOtp(MUTABLE_OTP_POLICY, MUTABLE_OTP_DEFINITION, 3, 300L, genParam);
     }
 
     private void provisionOtp(final String policyName, final String definitionName, final Integer attemptLimit,

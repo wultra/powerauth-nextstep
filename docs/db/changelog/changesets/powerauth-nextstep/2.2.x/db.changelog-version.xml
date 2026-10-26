@@ -6,6 +6,5 @@
 
     <include file="20260407-add-subject-id-to-audit-log.xml" relativeToChangelogFile="true" />
     <include file="20260723-add-tag-2.2.0.xml" relativeToChangelogFile="true" />
-    <include file="20261026-add-contact-verification.xml" relativeToChangelogFile="true" />
 
 </databaseChangeLog>

@@ -1,6 +1,6 @@
 /*
  * PowerAuth Web Flow and related software components
- * Copyright (C) 2025 Wultra s.r.o.
+ * Copyright (C) 2026 Wultra s.r.o.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published
@@ -22,6 +22,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import lombok.ToString;
 
 /**
  * Request object used for confirming verification of a user contact.
@@ -61,11 +62,13 @@ public class ConfirmContactVerificationRequest {
     /**
      * OTP value entered by the user for the {@code OTP} method.
      */
+    @ToString.Exclude
     private String otpValue;
 
     /**
      * Token extracted by the caller from the deeplink for the {@code DEEPLINK} method.
      */
+    @ToString.Exclude
     private String token;
 
 }
