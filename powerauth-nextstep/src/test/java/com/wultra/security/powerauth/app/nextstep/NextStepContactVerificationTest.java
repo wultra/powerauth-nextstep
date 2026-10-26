@@ -32,6 +32,7 @@ import com.wultra.security.powerauth.lib.nextstep.model.exception.UserNotFoundEx
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpDefinitionRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpPolicyRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateUserRequest;
+import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateOtpDefinitionRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateOtpPolicyRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateUserRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.response.ConfirmContactVerificationResponse;
@@ -400,6 +401,35 @@ class NextStepContactVerificationTest extends NextStepTest {
         setMutablePolicyLimit(3);
     }
 
+    @Test
+    void rejectsConfirmationWhenProxyEnabledAfterStart() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = nextStepClient.startContactVerification(userId, CONTACT_NAME,
+                CONTACT_TYPE, ContactVerificationMethod.OTP, MUTABLE_OTP_DEFINITION).getResponseObject();
+
+        setMutableDefinitionProxyEnabled(true);
+        try {
+            final ConfirmContactVerificationResponse response =
+                    confirm(userId, CONTACT_NAME, start.getVerificationId(), start.getOtpValue(), null);
+
+            assertFalse(response.isVerified());
+            assertNull(response.getRemainingAttempts());
+            assertEquals(OtpStatus.REMOVED, nextStepClient.getOtpDetail(start.getVerificationId(), null)
+                    .getResponseObject().getOtpDetail().getOtpStatus());
+        } finally {
+            setMutableDefinitionProxyEnabled(false);
+        }
+    }
+
+    private void setMutableDefinitionProxyEnabled(final boolean enabled) throws NextStepClientException {
+        final UpdateOtpDefinitionRequest update = new UpdateOtpDefinitionRequest();
+        update.setOtpDefinitionName(MUTABLE_OTP_DEFINITION);
+        update.setApplicationName("TEST_APP");
+        update.setOtpPolicyName(MUTABLE_OTP_POLICY);
+        update.setDataAdapterProxyEnabled(enabled);
+        nextStepClient.updateOtpDefinition(update);
+    }
+
     private void setMutablePolicyLimit(final Integer attemptLimit) throws NextStepClientException {
         final UpdateOtpPolicyRequest update = new UpdateOtpPolicyRequest();
         update.setOtpPolicyName(MUTABLE_OTP_POLICY);
@@ -637,7 +667,7 @@ class NextStepContactVerificationTest extends NextStepTest {
                 try {
                     results.add(future.get());
                 } catch (ExecutionException ex) {
-                    results.add(null);
+                    throw new AssertionError("Concurrent task failed", ex.getCause());
                 }
             }
             return results;

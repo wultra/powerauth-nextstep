@@ -268,12 +268,13 @@ public class ContactVerificationService {
             return auditedFailure(request.getUserId(), contact.getName());
         }
 
-        // Re-check the attempt limit against the current policy before authenticating. The definition may have been
-        // edited after the verification was started: removing the limit (null) or lowering it below the already-recorded
-        // failed attempts would otherwise let the OTP be guessed further, because authentication only blocks when the
-        // remaining attempts reach exactly zero. Either case fails generically and invalidates the OTP.
+        // Re-check mutable OTP definition settings before authenticating. If proxy mode was enabled after the
+        // verification started, authentication would enter the proxy branch without an operation. Removing the
+        // attempt limit or lowering it below the recorded failures could also allow further guesses.
         final Integer currentAttemptLimit = otp.getOtpDefinition().getOtpPolicy().getAttemptLimit();
-        if (currentAttemptLimit == null || otp.getFailedAttemptCounter() >= currentAttemptLimit) {
+        if (otp.getOtpDefinition().isDataAdapterProxyEnabled()
+                || currentAttemptLimit == null
+                || otp.getFailedAttemptCounter() >= currentAttemptLimit) {
             try {
                 blockOtp(otpId);
             } catch (OtpNotFoundException ex) {
