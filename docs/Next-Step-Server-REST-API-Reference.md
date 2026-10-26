@@ -7185,6 +7185,7 @@ The list of expected status codes:
     "verificationId": "f1e2d3c4-b5a6-7890-abcd-ef0123456789",
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE",
+    "contactValue": "+420123456",
     "method": "OTP",
     "expiresAt": "2026-10-26T18:30:00Z",
     "otpValue": "12345678",

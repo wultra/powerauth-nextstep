@@ -48,6 +48,11 @@ public class StartContactVerificationResponse {
     private ContactType contactType;
 
     /**
+     * Value of the contact being verified.
+     */
+    private String contactValue;
+
+    /**
      * Verification method that was started.
      */
     private ContactVerificationMethod method;

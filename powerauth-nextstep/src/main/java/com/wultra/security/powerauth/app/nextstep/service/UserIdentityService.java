@@ -102,7 +102,7 @@ public class UserIdentityService {
         final EndToEndEncryptionService endToEndEncryptionService = serviceCatalogue.getEndToEndEncryptionService();
         final CredentialService credentialService = serviceCatalogue.getCredentialService();
 
-        final Optional<UserIdentityEntity> userOptional = userIdentityRepository.findById(request.getUserId());
+        final Optional<UserIdentityEntity> userOptional = userIdentityRepository.findAndLockByUserId(request.getUserId());
         UserIdentityEntity user;
         Map<String, RoleEntity> roleEntities = new HashMap<>();
         if (request.getRoles() != null) {
@@ -233,7 +233,7 @@ public class UserIdentityService {
         final EndToEndEncryptionService endToEndEncryptionService = serviceCatalogue.getEndToEndEncryptionService();
         final CredentialService credentialService = serviceCatalogue.getCredentialService();
 
-        UserIdentityEntity user = userIdentityRepository.findById(request.getUserId()).orElseThrow(() ->
+        UserIdentityEntity user = userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
                 new UserNotFoundException("User identity not found: " + request.getUserId()));
         // The findUser() method is not used to allow update REMOVED -> ACTIVE
         Map<String, RoleEntity> roleEntities = new HashMap<>();
@@ -610,6 +610,7 @@ public class UserIdentityService {
      */
     private List<UserContactDetail> updateContacts(UserIdentityEntity user, List<UserContactDetail> contacts) {
         final UserContactService userContactService = serviceCatalogue.getUserContactService();
+        final ContactVerificationService contactVerificationService = serviceCatalogue.getContactVerificationService();
         final List<UserContactDetail> contactListResponse = new ArrayList<>();
         final Set<UserContactEntity> existingContacts = user.getContacts();
         final Map<String, UserContactEntity> existingContactMap = new HashMap<>();
@@ -617,6 +618,8 @@ public class UserIdentityService {
         // Persist new or update existing contacts
         for (UserContactDetail contactToAdd : contacts) {
             UserContactEntity userContact = existingContactMap.get(contactToAdd.getContactName());
+            String oldValue = null;
+            ContactType oldType = null;
             if (userContact == null) {
                 userContact = new UserContactEntity();
                 userContact.setName(contactToAdd.getContactName());
@@ -625,28 +628,42 @@ public class UserIdentityService {
                 user.getContacts().add(userContact);
             } else {
                 userContact.setTimestampLastUpdated(new Date());
+                oldValue = userContact.getValue();
+                oldType = userContact.getType();
             }
             userContact.setType(contactToAdd.getContactType());
             userContact.setValue(contactToAdd.getContactValue());
             userContact.setPrimary(contactToAdd.isPrimary());
-            final UserContactDetail contactDetail = new UserContactDetail();
-            contactDetail.setContactName(userContact.getName());
-            contactDetail.setContactType(userContact.getType());
-            contactDetail.setContactValue(userContact.getValue());
-            contactDetail.setPrimary(userContact.isPrimary());
-            contactDetail.setTimestampCreated(userContact.getTimestampCreated());
-            contactDetail.setTimestampLastUpdated(userContact.getTimestampLastUpdated());
+            if (oldType != null && (!Objects.equals(oldValue, userContact.getValue()) || !oldType.equals(userContact.getType()))) {
+                // Changed binding: invalidate pending OTPs for the old value/type and reset verification.
+                invalidate(contactVerificationService, user.getUserId(), userContact.getName(), oldType, oldValue);
+                userContact.setVerificationMethod(null);
+                userContact.setTimestampVerified(null);
+            }
+            final UserContactDetail contactDetail = userContactConverter.fromEntity(userContact);
             contactListResponse.add(contactDetail);
         }
         // Remove obsolete contacts
         existingContactMap.forEach((contactName, contactEntity) -> {
             if (contacts.stream().noneMatch(c -> c.getContactName().equals(contactName))) {
+                invalidate(contactVerificationService, user.getUserId(), contactEntity.getName(), contactEntity.getType(), contactEntity.getValue());
                 user.getContacts().remove(contactEntity);
             }
         });
         // Ensure primary contacts are unique
         userContactService.ensurePrimaryContactsAreUnique(user);
         return contactListResponse;
+    }
+
+    /**
+     * Invalidate pending contact verifications, converting checked failures into a rollback-forcing runtime exception.
+     */
+    private void invalidate(ContactVerificationService svc, String userId, String name, ContactType type, String value) {
+        try {
+            svc.invalidatePendingContactVerifications(userId, name, type, value);
+        } catch (OtpNotFoundException | OperationNotFoundException | InvalidRequestException ex) {
+            throw new IllegalStateException("Failed to invalidate pending contact verifications for user ID: " + userId, ex);
+        }
     }
 
     /**

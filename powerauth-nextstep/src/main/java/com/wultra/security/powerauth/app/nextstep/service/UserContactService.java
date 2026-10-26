@@ -28,6 +28,7 @@ import com.wultra.security.powerauth.app.nextstep.service.catalogue.ServiceCatal
 import com.wultra.security.powerauth.lib.nextstep.model.entity.UserContactDetail;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.UserIdentityStatus;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.InvalidRequestException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.OperationNotFoundException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.OtpNotFoundException;
@@ -173,6 +174,9 @@ public class UserContactService {
         // verification start/confirm for the same user (preventing a stale value or a revived OTP across concurrent flows).
         UserIdentityEntity user = userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
                 new UserNotFoundException("User identity not found: " + request.getUserId()));
+        if (user.getStatus() == UserIdentityStatus.REMOVED) {
+            throw new UserNotFoundException("User identity is REMOVED: " + request.getUserId());
+        }
         Set<UserContactEntity> contacts = user.getContacts();
         Optional<UserContactEntity> contactOptional = contacts.stream().filter(c -> c.getName().equals(request.getContactName()) && c.getType().equals(request.getContactType())).findFirst();
         if (contactOptional.isEmpty()) {
@@ -246,14 +250,23 @@ public class UserContactService {
      */
     @Transactional
     public DeleteUserContactResponse deleteUserContact(DeleteUserContactRequest request) throws UserNotFoundException, UserContactNotFoundException {
-        final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
-        UserIdentityEntity user = userIdentityLookupService.findUser(request.getUserId());
+        UserIdentityEntity user = userIdentityRepository.findAndLockByUserId(request.getUserId()).orElseThrow(() ->
+                new UserNotFoundException("User identity not found: " + request.getUserId()));
+        if (user.getStatus() == UserIdentityStatus.REMOVED) {
+            throw new UserNotFoundException("User identity is REMOVED: " + request.getUserId());
+        }
         Set<UserContactEntity> contacts = user.getContacts();
         Optional<UserContactEntity> contactOptional = contacts.stream().filter(c -> c.getName().equals(request.getContactName()) && c.getType().equals(request.getContactType())).findFirst();
         if (contactOptional.isEmpty()) {
             throw new UserContactNotFoundException("No user contact found: " + request.getContactName() + ", user ID: " + user.getUserId() + ", type: " + request.getContactType());
         }
         final UserContactEntity contact = contactOptional.get();
+        // Invalidate pending verifications so a delete and recreate of the same contact cannot reuse an old pending OTP.
+        try {
+            contactVerificationService.invalidatePendingContactVerifications(user.getUserId(), contact.getName(), contact.getType(), contact.getValue());
+        } catch (OtpNotFoundException | OperationNotFoundException | InvalidRequestException ex) {
+            throw new IllegalStateException("Failed to invalidate pending contact verifications for user ID: " + user.getUserId(), ex);
+        }
         user.getContacts().remove(contact);
         user = userIdentityRepository.save(user);
         logger.debug("User contact was deleted, user ID: {}, contact name: {}", user.getUserId(), contact.getName());

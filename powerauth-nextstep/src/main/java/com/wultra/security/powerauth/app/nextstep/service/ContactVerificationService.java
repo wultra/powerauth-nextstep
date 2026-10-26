@@ -148,8 +148,7 @@ public class ContactVerificationService {
         if (otpDefinition.getOtpPolicy().getExpirationTime() == null) {
             throw new InvalidConfigurationException("Contact verification OTP definition must define an expiration time, definition: " + request.getOtpDefinitionName());
         }
-        // Guard: the data adapter proxy branch has no operation in this local, operation-less flow and would dereference
-        // a null operation (NPE) at confirmation, so proxy-enabled definitions are rejected up front.
+        // Reject proxy-enabled definitions: the proxy branch has no operation in this operation-less flow and would NPE at confirmation.
         if (otpDefinition.isDataAdapterProxyEnabled()) {
             throw new InvalidConfigurationException("Contact verification OTP definition must not be data adapter proxy enabled, definition: " + request.getOtpDefinitionName());
         }
@@ -180,6 +179,7 @@ public class ContactVerificationService {
         final StartContactVerificationResponse response = new StartContactVerificationResponse();
         response.setVerificationId(otpId);
         response.setContactName(contact.getName());
+        response.setContactValue(contact.getValue());
         response.setContactType(contact.getType());
         response.setMethod(method);
         response.setExpiresAt(otp.getTimestampExpires());
@@ -283,7 +283,7 @@ public class ContactVerificationService {
         authRequest.setUpdateOperation(false);
         final OtpAuthenticationResponse authResponse;
         try {
-            authResponse = serviceCatalogue.getAuthenticationService().authenticateWithOtp(authRequest);
+            authResponse = serviceCatalogue.getAuthenticationService().authenticateWithOtpInternal(authRequest);
         } catch (OtpNotFoundException ex) {
             return failed(null);
         }
@@ -477,7 +477,7 @@ public class ContactVerificationService {
             final String separator = beforeFragment.contains("?") ? "&" : "?";
             finalUrl = beforeFragment + separator + "token=" + otpValue + fragment;
         }
-        // Validate the final URL too, so a messageTemplate cannot bypass the scheme/host guards (finding #2).
+        // Validate the final URL too, so a messageTemplate cannot bypass the scheme/host guards.
         validateDeeplinkUrl(finalUrl);
         return finalUrl;
     }
