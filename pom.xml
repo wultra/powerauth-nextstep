@@ -14,7 +14,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.7</version>
+        <version>4.1.1</version>
         <relativePath/> <!-- lookup parent from the repository -->
     </parent>
 
@@ -74,13 +74,13 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <bcprov-jdk18on.version>1.85</bcprov-jdk18on.version>
+        <bcprov-jdk18on.version>1.86</bcprov-jdk18on.version>
         <passay.version>2.0.0</passay.version>
-        <shedlock.version>7.7.0</shedlock.version>
-        <central.publishing.plugin.version>0.11.0</central.publishing.plugin.version>
+        <shedlock.version>7.10.1</shedlock.version>
+        <central.publishing.plugin.version>0.12.0</central.publishing.plugin.version>
 
         <!-- Documentation Dependencies -->
-        <springdoc-openapi-starter-webmvc-ui.version>3.0.3</springdoc-openapi-starter-webmvc-ui.version>
+        <springdoc-openapi-starter-webmvc-ui.version>3.1.1</springdoc-openapi-starter-webmvc-ui.version>
 
         <logstash.version>9.0</logstash.version>
 
@@ -88,7 +88,6 @@
         <wultra-core.version>2.3.0-SNAPSHOT</wultra-core.version>
         <powerauth.version>2.3.0-SNAPSHOT</powerauth.version>
         <powerauth-crypto.version>2.3.0-SNAPSHOT</powerauth-crypto.version>
-        <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -292,7 +291,6 @@
             <plugin>
                 <groupId>org.cyclonedx</groupId>
                 <artifactId>cyclonedx-maven-plugin</artifactId>
-                <version>${cyclonedx-maven-plugin.version}</version>
             </plugin>
         </plugins>
     </build>
