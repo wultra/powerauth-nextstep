@@ -184,7 +184,7 @@ The credential policy requires following configuration:
 - `username_gen_algorithm` - name of algorithm used for generating username: `NO_USERNAME`, `RANDOM_DIGITS`, or `RANDOM_LETTERS`
 - `username_gen_param` - parameters of the username generating algorithm: `length` (only applies to algorithms `RANDOM_DIGITS` and `RANDOM_LETTERS`)
 - `credential_gen_algorithm` - name of algorithm used for generating credentials: `RANDOM_PASSWORD` or `RANDOM_PIN`
-- `credential_gen_param` - parameters of the credential generating algorithm: `length`, `includeSmallLetters`, `smallLettersCount`, `includeCapitalLetters`, `capitalLettersCount`, `includeDigits`, `digitsCount`, `includeSpecialChars`, `specialCharsCount`
+- `credential_gen_param` - parameters of the credential generating algorithm: `length`, `includeSmallLetters`, `smallLettersCount`, `includeCapitalLetters`, `capitalLettersCount`, `includeDigits`, `digitsCount`, `includeSpecialChars`, `specialCharsCount`, `specialChars` (optional set of special characters to use; defaults to `^<>{};:.,~!?@#$%=&*[]()`)
 - `credential_val_param` - parameters of credential validation based on the [Passay library rules](https://www.passay.org): `includeWhitespaceRule`, `includeUsernameRule`, `includeAllowedCharacterRule`, `allowedChars`, `includeAllowedRegexRule`, `allowedRegex`, `includeIllegalCharacterRule`, `illegalChars`, `includeIllegalRegexRule`, `illegalRegex`, `includeCharacterRule`, `includeSmallLetters`, `smallLettersMin`, `includeCapitalLetters`, `capitalLettersMin`, `includeAlphabeticalLetters`, `alphabeticalLettersMin`, `includeDigits`, `digitsMin`, `includeSpecialChars`, `specialCharsMin`
 - `timestamp_created` - timestamp when credential policy was created
 
