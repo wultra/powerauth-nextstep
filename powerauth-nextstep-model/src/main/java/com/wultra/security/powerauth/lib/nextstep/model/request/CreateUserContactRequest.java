@@ -18,6 +18,7 @@
 package com.wultra.security.powerauth.lib.nextstep.model.request;
 
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -43,5 +44,9 @@ public class CreateUserContactRequest {
     @Size(min = 2, max = 256)
     private String contactValue;
     private boolean primary;
+    /**
+     * Optional method asserting that the contact has been verified by the caller. When {@code null}, the contact is created as unverified.
+     */
+    private ContactVerificationMethod verificationMethod;
 
 }

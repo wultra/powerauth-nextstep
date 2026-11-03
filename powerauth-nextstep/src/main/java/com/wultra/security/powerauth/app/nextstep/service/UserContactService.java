@@ -27,6 +27,7 @@ import com.wultra.security.powerauth.app.nextstep.repository.model.entity.UserId
 import com.wultra.security.powerauth.app.nextstep.service.catalogue.ServiceCatalogue;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.UserContactDetail;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserContactAlreadyExistsException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserContactNotFoundException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserNotFoundException;
@@ -47,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -104,6 +106,10 @@ public class UserContactService {
         contact.setValue(request.getContactValue());
         contact.setPrimary(request.isPrimary());
         contact.setTimestampCreated(new Date());
+        if (request.getVerificationMethod() != null) {
+            contact.setVerificationMethod(request.getVerificationMethod());
+            contact.setTimestampVerified(new Date());
+        }
         user.getContacts().add(contact);
         // Ensure primary contacts are unique
         ensurePrimaryContactsAreUnique(user);
@@ -120,6 +126,8 @@ public class UserContactService {
         response.setContactType(contact.getType());
         response.setContactValue(contact.getValue());
         response.setPrimary(contact.isPrimary());
+        response.setVerificationMethod(contact.getVerificationMethod());
+        response.setTimestampVerified(contact.getTimestampVerified());
         return response;
     }
 
@@ -160,12 +168,25 @@ public class UserContactService {
             throw new UserContactNotFoundException("User contact not found: " + request.getContactName() + ", user ID: " + user.getUserId() + ", type: " + request.getContactType());
         }
         final UserContactEntity contact = contactOptional.get();
+        final boolean valueChanged = !Objects.equals(contact.getValue(), request.getContactValue());
+        if (valueChanged) {
+            // Invalidate pending verifications of the old value so they cannot be revived by changing the value back
+            serviceCatalogue.getContactVerificationService().invalidatePendingVerifications(contact);
+        }
         contact.setUser(user);
         contact.setName(request.getContactName());
         contact.setType(request.getContactType());
         contact.setValue(request.getContactValue());
         contact.setPrimary(request.isPrimary());
         contact.setTimestampLastUpdated(new Date());
+        // A changed value is unverified unless the caller asserts a verification method for it
+        if (request.getVerificationMethod() != null && (valueChanged || !request.getVerificationMethod().equals(contact.getVerificationMethod()))) {
+            contact.setVerificationMethod(request.getVerificationMethod());
+            contact.setTimestampVerified(new Date());
+        } else if (valueChanged) {
+            contact.setVerificationMethod(null);
+            contact.setTimestampVerified(null);
+        }
         // Ensure primary contacts are unique
         ensurePrimaryContactsAreUnique(user);
         user = userIdentityRepository.save(user);
@@ -181,6 +202,8 @@ public class UserContactService {
         response.setContactType(contact.getType());
         response.setContactValue(contact.getValue());
         response.setPrimary(contact.isPrimary());
+        response.setVerificationMethod(contact.getVerificationMethod());
+        response.setTimestampVerified(contact.getTimestampVerified());
         return response;
     }
 
@@ -201,6 +224,7 @@ public class UserContactService {
             throw new UserContactNotFoundException("No user contact found: " + request.getContactName() + ", user ID: " + user.getUserId() + ", type: " + request.getContactType());
         }
         final UserContactEntity contact = contactOptional.get();
+        serviceCatalogue.getContactVerificationService().invalidatePendingVerifications(contact);
         user.getContacts().remove(contact);
         user = userIdentityRepository.save(user);
         logger.debug("User contact was deleted, user ID: {}, contact name: {}", user.getUserId(), contact.getName());
@@ -214,6 +238,19 @@ public class UserContactService {
         response.setContactName(request.getContactName());
         response.setContactType(request.getContactType());
         return response;
+    }
+
+    /**
+     * Mark a user contact as verified using the given verification method.
+     * @param contact User contact entity.
+     * @param method Verification method that confirmed the contact.
+     */
+    @Transactional
+    public void markContactVerified(UserContactEntity contact, ContactVerificationMethod method) {
+        contact.setVerificationMethod(method);
+        contact.setTimestampVerified(new Date());
+        userIdentityRepository.save(contact.getUser());
+        logger.debug("User contact was verified, user ID: {}, contact name: {}", contact.getUser().getUserId(), contact.getName());
     }
 
     /**

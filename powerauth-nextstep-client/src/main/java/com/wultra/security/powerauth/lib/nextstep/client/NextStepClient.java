@@ -2116,6 +2116,28 @@ public class NextStepClient {
     }
 
     /**
+     * Start verification of a user contact.
+     *
+     * @param request Start contact verification request.
+     * @return Start contact verification response.
+     * @throws NextStepClientException Thrown when REST API call fails, including {@link ErrorResponse} with error code.
+     */
+    public ObjectResponse<StartContactVerificationResponse> startContactVerification(@NotNull final StartContactVerificationRequest request) throws NextStepClientException {
+        return postObjectImpl("/user/contact/verification/start", new ObjectRequest<>(request), StartContactVerificationResponse.class);
+    }
+
+    /**
+     * Confirm verification of a user contact.
+     *
+     * @param request Confirm contact verification request.
+     * @return Confirm contact verification response.
+     * @throws NextStepClientException Thrown when REST API call fails, including {@link ErrorResponse} with error code.
+     */
+    public ObjectResponse<ConfirmContactVerificationResponse> confirmContactVerification(@NotNull final ConfirmContactVerificationRequest request) throws NextStepClientException {
+        return postObjectImpl("/user/contact/verification/confirm", new ObjectRequest<>(request), ConfirmContactVerificationResponse.class);
+    }
+
+    /**
      * Create a user alias.
      *
      * @param userId User ID.

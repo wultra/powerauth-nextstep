@@ -18,6 +18,7 @@
 package com.wultra.security.powerauth.app.nextstep.repository.model.entity;
 
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -68,5 +69,12 @@ public class UserContactEntity implements Serializable {
 
     @Column(name = "timestamp_last_updated")
     private Date timestampLastUpdated;
+
+    @Column(name = "verification_method", length = 32)
+    @Enumerated(EnumType.STRING)
+    private ContactVerificationMethod verificationMethod;
+
+    @Column(name = "timestamp_verified")
+    private Date timestampVerified;
 
 }
