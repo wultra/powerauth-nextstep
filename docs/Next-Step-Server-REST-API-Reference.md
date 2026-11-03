@@ -101,6 +101,8 @@ Following topics are covered in this chapter:
   - [List user contacts](#list-user-contacts)
   - [Update a user contact](#update-a-user-contact)
   - [Delete a user contact](#delete-a-user-contact)
+  - [Start verification of a user contact](#start-verification-of-a-user-contact)
+  - [Confirm verification of a user contact](#confirm-verification-of-a-user-contact)
   - [Create a user alias](#create-a-user-alias)
   - [List user aliases](#list-user-aliases)
   - [Update a user alias](#update-a-user-alias)
@@ -6009,6 +6011,8 @@ The list of expected status codes:
 
 Create a user identity.
 
+
+
 <!-- begin remove -->
 <table>
     <tr>
@@ -6229,6 +6233,8 @@ The list of expected status codes:
 ### Update a User Identity
 
 Update a user identity.
+
+
 
 This method has a `POST /user/update` alternative.
 
@@ -6817,6 +6823,8 @@ The list of expected status codes:
 
 Create a user contact.
 
+The optional `verificationMethod` field asserts that the caller has already verified the contact. Allowed values are `OTP` and `MANUAL`. When present, the server records the method and sets `timestampVerified` to the current server time; when omitted, the contact is created as unverified (both fields `null`). Setting `verificationMethod` is a trust assertion and is the responsibility of the calling system.
+
 <!-- begin remove -->
 <table>
     <tr>
@@ -6852,7 +6860,8 @@ The list of expected status codes:
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE",
     "contactValue": "+420602123456",
-    "primary": true
+    "primary": true,
+    "verificationMethod": "OTP"
   }
 }
 ```
@@ -6870,7 +6879,9 @@ The list of expected status codes:
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE",
     "contactValue": "+420602123456",
-    "primary": true
+    "primary": true,
+    "verificationMethod": "OTP",
+    "timestampVerified": "2021-07-02T09:47:36+0000"
   }
 }
 ```
@@ -6947,7 +6958,9 @@ The list of expected status codes:
         "contactValue": "+4201234567",
         "primary": false,
         "timestampCreated": "2021-07-02T09:47:36+0000",
-        "timestampLastUpdated": "2021-07-02T11:27:30+0000"
+        "timestampLastUpdated": "2021-07-02T11:27:30+0000",
+        "verificationMethod": "OTP",
+        "timestampVerified": "2021-07-02T11:27:30+0000"
       }
     ]
   }
@@ -6959,6 +6972,8 @@ The list of expected status codes:
 ### Update a User Contact
 
 Update a user contact.
+
+The optional `verificationMethod` field (`OTP` or `MANUAL`) asserts that the new contact value was verified. When the contact value changes and `verificationMethod` is omitted, the verification is reset (both `verificationMethod` and `timestampVerified` become `null`). `timestampVerified` is always server-generated.
 
 This method has a `POST /user/contact/update` alternative.
 
@@ -7009,7 +7024,8 @@ The list of expected status codes:
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE",
     "contactValue": "+420605789651",
-    "primary": true
+    "primary": true,
+    "verificationMethod": "OTP"
   }
 }
 ```
@@ -7027,7 +7043,9 @@ The list of expected status codes:
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE",
     "contactValue": "+420605789651",
-    "primary": true
+    "primary": true,
+    "verificationMethod": "OTP",
+    "timestampVerified": "2021-07-02T11:27:30+0000"
   }
 }
 ```
@@ -7089,6 +7107,138 @@ The list of expected status codes:
     "userId": "test1234",
     "contactName": "TEST_CONTACT",
     "contactType": "PHONE"
+  }
+}
+```
+<!-- end -->
+
+<!-- begin api POST /user/contact/verification/start -->
+### Start Verification of a User Contact
+
+Start verification of a user contact by issuing a one-time password. The OTP value is returned in the response; Next Step does **not** deliver it. The caller is responsible for delivering the OTP value to the contact through its own channel and message template.
+
+The referenced OTP definition (`otpDefinitionName`) must use a random generation algorithm (`OTP_RANDOM_DIGIT_GROUPS`).
+
+
+
+<!-- begin remove -->
+<table>
+    <tr>
+        <td>Method</td>
+        <td><code>POST</code></td>
+    </tr>
+    <tr>
+        <td>Resource URI</td>
+        <td><code>/user/contact/verification/start</code></td>
+    </tr>
+</table>
+<!-- end -->
+
+The list of expected status codes:
+
+| Code | Description                                                                                                                                                  |
+|------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 200  | OK response - request succeeded                                                                                                                              |
+| 400  | `REQUEST_VALIDATION_FAILED` - request validation failed                                                                                                      |
+| 400  | `USER_IDENTITY_NOT_FOUND` - user identity with identifier specified in the request was not found                                                             |
+| 400  | `USER_CONTACT_NOT_FOUND` - user contact was not found                                                                                                        |
+| 400  | `INVALID_CONFIGURATION` - the OTP definition uses the `OTP_DATA_DIGEST` algorithm, has no attempt limit or expiration time, or is data adapter proxy enabled |
+| 400  | `OTP_DEFINITION_NOT_FOUND` - the OTP definition was not found                                                                                                |
+| 500  | Server error - unexpected error occurred                                                                                                                     |
+
+#### Request
+
+- Headers:
+  - `Content-Type: application/json`
+
+```json
+{
+  "requestObject": {
+    "userId": "test1234",
+    "contactName": "TEST_CONTACT",
+    "contactType": "PHONE",
+    "otpDefinitionName": "CONTACT_VERIFICATION"
+  }
+}
+```
+
+#### Response 200
+
+- Headers:
+  - `Content-Type: application/json`
+
+```json
+{
+  "status": "OK",
+  "responseObject": {
+    "verificationId": "f1e2d3c4-b5a6-7890-abcd-ef0123456789",
+    "expiresAt": "2026-10-26T18:30:00Z",
+    "otpValue": "12345678"
+  }
+}
+```
+<!-- end -->
+
+<!-- begin api POST /user/contact/verification/confirm -->
+### Confirm Verification of a User Contact
+
+Confirm verification of a user contact. The caller supplies the `otpValue`. On success the contact's `verificationMethod` is set to `OTP` and `timestampVerified` to the current server time. A wrong or unknown OTP returns `verified: false`.
+
+
+
+<!-- begin remove -->
+<table>
+    <tr>
+        <td>Method</td>
+        <td><code>POST</code></td>
+    </tr>
+    <tr>
+        <td>Resource URI</td>
+        <td><code>/user/contact/verification/confirm</code></td>
+    </tr>
+</table>
+<!-- end -->
+
+The list of expected status codes:
+
+| Code | Description                                                                                                                                                                  |
+|------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 200  | OK response - request processed (see `verified` flag); `verified` is `false` without revealing the cause when the user or contact is unknown or removed, or the OTP is wrong |
+| 400  | `REQUEST_VALIDATION_FAILED` - request validation failed                                                                                                                      |
+| 400  | `INVALID_REQUEST` - the request is invalid                                                                                                                                   |
+| 400  | `INVALID_CONFIGURATION` - the server configuration is invalid                                                                                                                |
+| 500  | Server error - unexpected error occurred                                                                                                                                     |
+
+#### Request
+
+- Headers:
+  - `Content-Type: application/json`
+
+```json
+{
+  "requestObject": {
+    "userId": "test1234",
+    "contactName": "TEST_CONTACT",
+    "contactType": "PHONE",
+    "verificationId": "f1e2d3c4-b5a6-7890-abcd-ef0123456789",
+    "otpValue": "12345678"
+  }
+}
+```
+
+#### Response 200
+
+- Headers:
+  - `Content-Type: application/json`
+
+```json
+{
+  "status": "OK",
+  "responseObject": {
+    "verified": true,
+    "remainingAttempts": null,
+    "verificationMethod": "OTP",
+    "timestampVerified": "2026-10-26T18:25:00Z"
   }
 }
 ```

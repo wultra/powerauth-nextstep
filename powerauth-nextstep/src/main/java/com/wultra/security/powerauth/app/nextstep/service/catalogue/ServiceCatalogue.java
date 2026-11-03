@@ -37,6 +37,7 @@ public class ServiceCatalogue {
     private AuthenticationService authenticationService;
     private AuthMethodChangeService authMethodChangeService;
     private AuthMethodService authMethodService;
+    private ContactVerificationService contactVerificationService;
     private CredentialCounterService credentialCounterService;
     private CredentialDefinitionService credentialDefinitionService;
     private CredentialGenerationService credentialGenerationService;
@@ -105,6 +106,15 @@ public class ServiceCatalogue {
     @Autowired
     public void setAuthMethodService(AuthMethodService authMethodService) {
         this.authMethodService = authMethodService;
+    }
+
+    /**
+     * Set contact verification service.
+     * @param contactVerificationService Contact verification service.
+     */
+    @Autowired
+    public void setContactVerificationService(ContactVerificationService contactVerificationService) {
+        this.contactVerificationService = contactVerificationService;
     }
 
     /**
@@ -425,6 +435,14 @@ public class ServiceCatalogue {
      */
     public AuthMethodService getAuthMethodService() {
         return authMethodService;
+    }
+
+    /**
+     * Get contact verification service.
+     * @return Contact verification service.
+     */
+    public ContactVerificationService getContactVerificationService() {
+        return contactVerificationService;
     }
 
     /**

@@ -626,6 +626,12 @@ public class UserIdentityService {
             } else {
                 userContact.setTimestampLastUpdated(new Date());
             }
+            if (userContact.getValue() != null && (!userContact.getValue().equals(contactToAdd.getContactValue()) || userContact.getType() != contactToAdd.getContactType())) {
+                // A changed contact is no longer verified and its pending verifications are invalidated
+                serviceCatalogue.getContactVerificationService().invalidatePendingVerifications(userContact);
+                userContact.setVerificationMethod(null);
+                userContact.setTimestampVerified(null);
+            }
             userContact.setType(contactToAdd.getContactType());
             userContact.setValue(contactToAdd.getContactValue());
             userContact.setPrimary(contactToAdd.isPrimary());
@@ -636,11 +642,14 @@ public class UserIdentityService {
             contactDetail.setPrimary(userContact.isPrimary());
             contactDetail.setTimestampCreated(userContact.getTimestampCreated());
             contactDetail.setTimestampLastUpdated(userContact.getTimestampLastUpdated());
+            contactDetail.setVerificationMethod(userContact.getVerificationMethod());
+            contactDetail.setTimestampVerified(userContact.getTimestampVerified());
             contactListResponse.add(contactDetail);
         }
         // Remove obsolete contacts
         existingContactMap.forEach((contactName, contactEntity) -> {
             if (contacts.stream().noneMatch(c -> c.getContactName().equals(contactName))) {
+                serviceCatalogue.getContactVerificationService().invalidatePendingVerifications(contactEntity);
                 user.getContacts().remove(contactEntity);
             }
         });
