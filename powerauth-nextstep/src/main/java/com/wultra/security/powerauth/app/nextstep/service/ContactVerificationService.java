@@ -40,6 +40,8 @@ import com.wultra.security.powerauth.lib.nextstep.model.response.ConfirmContactV
 import com.wultra.security.powerauth.lib.nextstep.model.response.CreateOtpResponse;
 import com.wultra.security.powerauth.lib.nextstep.model.response.OtpAuthenticationResponse;
 import com.wultra.security.powerauth.lib.nextstep.model.response.StartContactVerificationResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -60,6 +62,8 @@ import java.util.stream.Stream;
  */
 @Service
 public class ContactVerificationService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ContactVerificationService.class);
 
     private static final String AUDIT_TYPE_USER_IDENTITY = "USER_IDENTITY";
 
@@ -164,6 +168,7 @@ public class ContactVerificationService {
         try {
             contact = findContact(request.getUserId(), request.getContactName(), request.getContactType());
         } catch (UserNotFoundException | UserContactNotFoundException ex) {
+            logger.debug("Contact verification failed, user or contact not found, user ID: {}", request.getUserId(), ex);
             return failed();
         }
 
@@ -172,6 +177,7 @@ public class ContactVerificationService {
         try {
             otp = serviceCatalogue.getOtpService().findOtp(request.getVerificationId(), null);
         } catch (OtpNotFoundException ex) {
+            logger.debug("Contact verification OTP not found, verification ID: {}", request.getVerificationId(), ex);
             return failed();
         }
         if (!request.getUserId().equals(otp.getUserId()) || !computeBindingHash(contact).equals(otp.getOtpData())) {
@@ -187,11 +193,7 @@ public class ContactVerificationService {
         // enabled after the start must not allow further guesses or authentication without an operation.
         final Integer attemptLimit = otp.getOtpDefinition().getOtpPolicy().getAttemptLimit();
         if (otp.getOtpDefinition().isDataAdapterProxyEnabled() || attemptLimit == null || otp.getFailedAttemptCounter() >= attemptLimit) {
-            try {
-                invalidateOtp(otp.getOtpId());
-            } catch (OtpNotFoundException ex) {
-                // Already removed, nothing to invalidate.
-            }
+            invalidateOtp(otp.getOtpId());
             return failed();
         }
 
@@ -204,6 +206,7 @@ public class ContactVerificationService {
         try {
             authResponse = serviceCatalogue.getAuthenticationService().authenticateWithOtpInternal(authRequest, otp);
         } catch (OtpNotFoundException ex) {
+            logger.debug("Contact verification OTP disappeared during confirmation, verification ID: {}", request.getVerificationId(), ex);
             return failed();
         }
 
@@ -245,13 +248,13 @@ public class ContactVerificationService {
     public void invalidatePendingVerifications(UserContactEntity contact) {
         try {
             removeActiveVerifications(contact.getUser().getUserId(), computeBindingHash(contact));
-        } catch (OtpNotFoundException | OperationNotFoundException | InvalidRequestException ex) {
+        } catch (OperationNotFoundException | InvalidRequestException ex) {
             // Roll back instead of leaving a stale pending verification in place.
             throw new IllegalStateException("Failed to invalidate pending contact verifications", ex);
         }
     }
 
-    private void removeActiveVerifications(String userId, String bindingHash) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException {
+    private void removeActiveVerifications(String userId, String bindingHash) throws OperationNotFoundException, InvalidRequestException {
         final List<String> otpIds;
         // Filtered in memory: otp_data is a CLOB on Oracle and cannot be compared in SQL.
         try (final Stream<OtpEntity> activeOtps = otpRepository.findAllByUserIdAndStatus(userId, OtpStatus.ACTIVE)) {
@@ -262,10 +265,17 @@ public class ContactVerificationService {
         }
     }
 
-    private void invalidateOtp(String otpId) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException {
+    /**
+     * Invalidate an OTP. The operation is idempotent: an OTP that is already removed or missing is left as is.
+     */
+    private void invalidateOtp(String otpId) throws OperationNotFoundException, InvalidRequestException {
         final DeleteOtpRequest request = new DeleteOtpRequest();
         request.setOtpId(otpId);
-        serviceCatalogue.getOtpService().deleteOtp(request);
+        try {
+            serviceCatalogue.getOtpService().deleteOtp(request);
+        } catch (OtpNotFoundException ex) {
+            logger.debug("OTP is already removed, nothing to invalidate, OTP ID: {}", otpId, ex);
+        }
     }
 
     /**

@@ -7136,15 +7136,15 @@ The referenced OTP definition (`otpDefinitionName`) must use a random generation
 
 The list of expected status codes:
 
-| Code | Description |
-|------|-------------|
-| 200  | OK response - request succeeded |
-| 400  | `REQUEST_VALIDATION_FAILED` - request validation failed |
-| 400  | `USER_IDENTITY_NOT_FOUND` - user identity with identifier specified in the request was not found |
-| 400  | `USER_CONTACT_NOT_FOUND` - user contact was not found |
+| Code | Description                                                                                                                                                  |
+|------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 200  | OK response - request succeeded                                                                                                                              |
+| 400  | `REQUEST_VALIDATION_FAILED` - request validation failed                                                                                                      |
+| 400  | `USER_IDENTITY_NOT_FOUND` - user identity with identifier specified in the request was not found                                                             |
+| 400  | `USER_CONTACT_NOT_FOUND` - user contact was not found                                                                                                        |
 | 400  | `INVALID_CONFIGURATION` - the OTP definition uses the `OTP_DATA_DIGEST` algorithm, has no attempt limit or expiration time, or is data adapter proxy enabled |
-| 400  | `OTP_DEFINITION_NOT_FOUND` - the OTP definition was not found |
-| 500  | Server error - unexpected error occurred |
+| 400  | `OTP_DEFINITION_NOT_FOUND` - the OTP definition was not found                                                                                                |
+| 500  | Server error - unexpected error occurred                                                                                                                     |
 
 #### Request
 
@@ -7201,13 +7201,13 @@ Confirm verification of a user contact. The caller supplies the `otpValue`. On s
 
 The list of expected status codes:
 
-| Code | Description |
-|------|-------------|
+| Code | Description                                                                                                                                                                  |
+|------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 200  | OK response - request processed (see `verified` flag); `verified` is `false` without revealing the cause when the user or contact is unknown or removed, or the OTP is wrong |
-| 400  | `REQUEST_VALIDATION_FAILED` - request validation failed |
-| 400  | `INVALID_REQUEST` - the request is invalid |
-| 400  | `INVALID_CONFIGURATION` - the server configuration is invalid |
-| 500  | Server error - unexpected error occurred |
+| 400  | `REQUEST_VALIDATION_FAILED` - request validation failed                                                                                                                      |
+| 400  | `INVALID_REQUEST` - the request is invalid                                                                                                                                   |
+| 400  | `INVALID_CONFIGURATION` - the server configuration is invalid                                                                                                                |
+| 500  | Server error - unexpected error occurred                                                                                                                                     |
 
 #### Request
 

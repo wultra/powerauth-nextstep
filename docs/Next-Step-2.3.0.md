@@ -16,20 +16,7 @@ A new Liquibase changeset adds three nullable columns to support contact verific
 - `ns_user_contact.timestamp_verified` (`timestamp`) – time at which the contact was verified.
 - `ns_otp_storage.verification_method` (`varchar(32)`) – verification method the OTP was issued for.
 
-For operators applying the change manually (without Liquibase), run the following statements.
+For manual changes use SQL scripts:
 
-PostgreSQL:
-
-```sql
-ALTER TABLE ns_user_contact ADD verification_method VARCHAR(32);
-ALTER TABLE ns_user_contact ADD timestamp_verified TIMESTAMP;
-ALTER TABLE ns_otp_storage ADD verification_method VARCHAR(32);
-```
-
-Oracle:
-
-```sql
-ALTER TABLE ns_user_contact ADD verification_method VARCHAR2(32 CHAR);
-ALTER TABLE ns_user_contact ADD timestamp_verified TIMESTAMP;
-ALTER TABLE ns_otp_storage ADD verification_method VARCHAR2(32 CHAR);
-```
+- [PostgreSQL script](sql/postgresql/migration_2.2.0_2.3.0.sql)
+- [Oracle script](./sql/oracle/migration_2.2.0_2.3.0.sql)
