@@ -23,17 +23,22 @@ import com.wultra.security.powerauth.lib.nextstep.model.entity.UserContactDetail
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
 import com.wultra.security.powerauth.lib.nextstep.model.enumeration.OtpGenerationAlgorithm;
+import com.wultra.security.powerauth.lib.nextstep.model.exception.InvalidRequestException;
+import com.wultra.security.powerauth.lib.nextstep.model.exception.OtpDefinitionAlreadyExistsException;
+import com.wultra.security.powerauth.lib.nextstep.model.exception.OtpPolicyAlreadyExistsException;
 import com.wultra.security.powerauth.lib.nextstep.model.request.ConfirmContactVerificationRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpDefinitionRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpPolicyRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateUserRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.StartContactVerificationRequest;
+import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateUserRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.response.ConfirmContactVerificationResponse;
 import com.wultra.security.powerauth.lib.nextstep.model.response.StartContactVerificationResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -125,6 +130,60 @@ class NextStepContactVerificationTest extends NextStepTest {
     }
 
     @Test
+    void resetsVerificationWhenContactValueChangedViaUserUpdate() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = start(userId, OTP_DEFINITION);
+        assertTrue(confirm(userId, start.getVerificationId(), start.getOtpValue()).isVerified());
+
+        updateContactValueViaUserUpdate(userId, "changed@test.test");
+
+        final UserContactDetail contact = singleContact(userId);
+        assertNull(contact.getVerificationMethod());
+        assertNull(contact.getTimestampVerified());
+    }
+
+    @Test
+    void rejectsConfirmationAfterContactValueChangedAndRestoredViaUserUpdate() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = start(userId, OTP_DEFINITION);
+        updateContactValueViaUserUpdate(userId, "changed@test.test");
+        // Changing the value back must not revive the pending verification
+        updateContactValueViaUserUpdate(userId, "user@test.test");
+
+        final ConfirmContactVerificationResponse confirm = confirm(userId, start.getVerificationId(), start.getOtpValue());
+
+        assertFalse(confirm.isVerified());
+        assertNull(singleContact(userId).getVerificationMethod());
+    }
+
+    @Test
+    void rejectsVerificationOtpOnGenericOtpAuthentication() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = start(userId, OTP_DEFINITION);
+
+        final NextStepClientException ex = assertThrows(NextStepClientException.class,
+                () -> nextStepClient.authenticateWithOtp(start.getVerificationId(), start.getOtpValue()));
+
+        assertEquals(InvalidRequestException.CODE, ex.getError().getCode());
+        // The OTP is not consumed by the rejected call
+        assertTrue(confirm(userId, start.getVerificationId(), start.getOtpValue()).isVerified());
+    }
+
+    @Test
+    void rejectsConfirmationAfterContactDeletedAndRecreated() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = start(userId, OTP_DEFINITION);
+        nextStepClient.deleteUserContact(userId, CONTACT_NAME, CONTACT_TYPE);
+        // Same name, type and value yields the same binding hash, so only invalidation on deletion blocks the old OTP
+        nextStepClient.createUserContact(userId, CONTACT_NAME, CONTACT_TYPE, "user@test.test", true);
+
+        final ConfirmContactVerificationResponse confirm = confirm(userId, start.getVerificationId(), start.getOtpValue());
+
+        assertFalse(confirm.isVerified());
+        assertNull(singleContact(userId).getVerificationMethod());
+    }
+
+    @Test
     void rejectsOtpDefinitionWithDigestAlgorithm() throws NextStepClientException {
         final String userId = createUserWithContact("user@test.test");
 
@@ -164,6 +223,18 @@ class NextStepContactVerificationTest extends NextStepTest {
         return nextStepClient.confirmContactVerification(request).getResponseObject();
     }
 
+    private void updateContactValueViaUserUpdate(final String userId, final String value) throws NextStepClientException {
+        final UpdateUserRequest.UpdatedContact contact = new UpdateUserRequest.UpdatedContact();
+        contact.setContactName(CONTACT_NAME);
+        contact.setContactType(CONTACT_TYPE);
+        contact.setContactValue(value);
+        contact.setPrimary(true);
+        final UpdateUserRequest request = new UpdateUserRequest();
+        request.setUserId(userId);
+        request.setContacts(List.of(contact));
+        nextStepClient.updateUser(request);
+    }
+
     private String createUserWithContact(final String value) throws NextStepClientException {
         final String userId = UUID.randomUUID().toString();
         final CreateUserRequest request = new CreateUserRequest();
@@ -180,7 +251,7 @@ class NextStepContactVerificationTest extends NextStepTest {
                 .orElseThrow();
     }
 
-    private void provisionOtpDefinition() {
+    private void provisionOtpDefinition() throws NextStepClientException {
         final OtpGenerationParam genParam = new OtpGenerationParam();
         genParam.setGroupSize(2);
         final CreateOtpPolicyRequest policy = new CreateOtpPolicyRequest();
@@ -196,9 +267,20 @@ class NextStepContactVerificationTest extends NextStepTest {
         definition.setOtpPolicyName(policy.getOtpPolicyName());
         try {
             nextStepClient.createOtpPolicy(policy);
+        } catch (NextStepClientException ex) {
+            rethrowUnlessAlreadyExists(ex, OtpPolicyAlreadyExistsException.CODE);
+        }
+        try {
             nextStepClient.createOtpDefinition(definition);
         } catch (NextStepClientException ex) {
-            // Already provisioned by an earlier test in the shared Spring context.
+            rethrowUnlessAlreadyExists(ex, OtpDefinitionAlreadyExistsException.CODE);
+        }
+    }
+
+    // The Spring context is shared, so an earlier test may have provisioned the definition. Any other failure must surface.
+    private void rethrowUnlessAlreadyExists(final NextStepClientException ex, final String alreadyExistsCode) throws NextStepClientException {
+        if (!alreadyExistsCode.equals(ex.getError().getCode())) {
+            throw ex;
         }
     }
 
