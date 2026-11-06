@@ -348,7 +348,7 @@ public class AuthenticationService {
      * @throws EncryptionException Thrown when decryption fails.
      */
     @Transactional
-    public OtpAuthenticationResponse authenticateWithOtpInternal(OtpAuthenticationRequest request, OtpEntity otp) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException, CredentialNotFoundException, OperationAlreadyCanceledException, OperationAlreadyFinishedException, InvalidConfigurationException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
+    OtpAuthenticationResponse authenticateWithOtpInternal(OtpAuthenticationRequest request, OtpEntity otp) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException, CredentialNotFoundException, OperationAlreadyCanceledException, OperationAlreadyFinishedException, InvalidConfigurationException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
         final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
         final OperationPersistenceService operationPersistenceService = serviceCatalogue.getOperationPersistenceService();
         final CredentialService credentialService = serviceCatalogue.getCredentialService();
