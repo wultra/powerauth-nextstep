@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added verification tracking (`verificationMethod`, `timestampVerified`) to user contacts [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
-- Added an OTP contact verification flow (`POST /user/contact/verification/start` and `/confirm`) [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
+- Added an OTP contact verification flow (`POST /user/contact/verification/start` and `/confirm`), with OTPs marked by a new `otp_purpose` (`GENERIC`, `OPERATION`, `CONTACT_VERIFICATION`) [(#80)](https://github.com/wultra/powerauth-nextstep/issues/80)
 
 ### Changed
 

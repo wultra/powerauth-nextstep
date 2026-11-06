@@ -28,11 +28,10 @@ import com.wultra.security.powerauth.app.nextstep.service.catalogue.ServiceCatal
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.AuthenticationResult;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactType;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpPurpose;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpStatus;
-import com.wultra.security.powerauth.lib.nextstep.model.enumeration.OtpGenerationAlgorithm;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.*;
 import com.wultra.security.powerauth.lib.nextstep.model.request.ConfirmContactVerificationRequest;
-import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.DeleteOtpRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.OtpAuthenticationRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.StartContactVerificationRequest;
@@ -47,6 +46,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -111,11 +111,7 @@ public class ContactVerificationService {
             CredentialNotActiveException, CredentialNotFoundException, OtpNotFoundException, EncryptionException {
         final UserContactEntity contact = findContact(request.getUserId(), request.getContactName(), request.getContactType());
 
-        // A digest-based OTP would be a deterministic, predictable value derived from the binding hash.
         final OtpDefinitionEntity otpDefinition = serviceCatalogue.getOtpDefinitionService().findActiveOtpDefinition(request.getOtpDefinitionName());
-        if (otpDefinition.getOtpPolicy().getGenAlgorithm() == OtpGenerationAlgorithm.OTP_DATA_DIGEST) {
-            throw new InvalidConfigurationException("Contact verification OTP definition must use a random generation algorithm, definition: " + request.getOtpDefinitionName());
-        }
         // Without an attempt limit or expiration the OTP could be guessed or used indefinitely. The proxy branch needs
         // an operation, which this operation-less flow does not have.
         if (otpDefinition.getOtpPolicy().getAttemptLimit() == null || otpDefinition.getOtpPolicy().getExpirationTime() == null
@@ -124,17 +120,11 @@ public class ContactVerificationService {
         }
 
         final String bindingHash = computeBindingHash(contact);
-        removeActiveVerifications(request.getUserId(), bindingHash);
+        removeActiveVerifications(request.getUserId());
 
-        final CreateOtpRequest createOtpRequest = new CreateOtpRequest();
-        createOtpRequest.setUserId(request.getUserId());
-        createOtpRequest.setOtpName(request.getOtpDefinitionName());
-        createOtpRequest.setOtpData(bindingHash);
-        final CreateOtpResponse createOtpResponse = serviceCatalogue.getOtpService().createOtp(createOtpRequest);
+        final CreateOtpResponse createOtpResponse = serviceCatalogue.getOtpService().createContactVerificationOtp(otpDefinition, request.getUserId(), bindingHash);
         final OtpEntity otp = serviceCatalogue.getOtpService().findOtp(createOtpResponse.getOtpId(), null);
-        // Marks the OTP as issued by this flow so that confirmation, cleanup and the generic OTP endpoint can tell it apart.
-        otp.setVerificationMethod(ContactVerificationMethod.OTP);
-        otpRepository.save(otp);
+        logger.info("Contact verification started, verification ID: {}", otp.getOtpId());
 
         final StartContactVerificationResponse response = new StartContactVerificationResponse();
         response.setVerificationId(createOtpResponse.getOtpId());
@@ -147,8 +137,6 @@ public class ContactVerificationService {
      * Confirm verification of a user contact using the OTP value supplied by the caller.
      * @param request Confirm contact verification request.
      * @return Confirm contact verification response.
-     * @throws UserNotFoundException Thrown when user identity is not found.
-     * @throws UserContactNotFoundException Thrown when user contact is not found.
      * @throws InvalidRequestException Thrown when the request is invalid.
      * @throws InvalidConfigurationException Thrown when the configuration is invalid.
      * @throws OperationNotFoundException Thrown when an operation is not found.
@@ -161,15 +149,14 @@ public class ContactVerificationService {
      * @throws EncryptionException Thrown when encryption or decryption fails.
      */
     @Transactional
-    public ConfirmContactVerificationResponse confirmContactVerification(ConfirmContactVerificationRequest request) throws UserNotFoundException, UserContactNotFoundException,
-            InvalidRequestException, InvalidConfigurationException, OperationNotFoundException, CredentialNotFoundException, OperationAlreadyCanceledException,
+    public ConfirmContactVerificationResponse confirmContactVerification(ConfirmContactVerificationRequest request) throws InvalidRequestException, InvalidConfigurationException, OperationNotFoundException, CredentialNotFoundException, OperationAlreadyCanceledException,
             OperationAlreadyFinishedException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
         final UserContactEntity contact;
         try {
             contact = findContact(request.getUserId(), request.getContactName(), request.getContactType());
         } catch (UserNotFoundException | UserContactNotFoundException ex) {
-            logger.debug("Contact verification failed, user or contact not found, user ID: {}", request.getUserId(), ex);
-            return failed();
+            logger.debug("Contact verification failed, user or contact not found", ex);
+            return failed(request.getVerificationId(), "user or contact not found");
         }
 
         // The OTP must be bound to the current user and contact value, otherwise it was issued for a different contact or value.
@@ -177,16 +164,15 @@ public class ContactVerificationService {
         try {
             otp = serviceCatalogue.getOtpService().findOtp(request.getVerificationId(), null);
         } catch (OtpNotFoundException ex) {
-            logger.debug("Contact verification OTP not found, verification ID: {}", request.getVerificationId(), ex);
-            return failed();
+            logger.debug("Contact verification OTP not found", ex);
+            return failed(request.getVerificationId(), "verification not found");
         }
         if (!request.getUserId().equals(otp.getUserId()) || !computeBindingHash(contact).equals(otp.getOtpData())) {
-            return failed();
+            return failed(request.getVerificationId(), "verification does not match the user or contact");
         }
 
-        // A null method means the OTP was not issued by this flow.
-        if (otp.getVerificationMethod() != ContactVerificationMethod.OTP) {
-            return failed();
+        if (otp.getOtpPurpose() != OtpPurpose.CONTACT_VERIFICATION) {
+            return failed(request.getVerificationId(), "OTP was not issued for contact verification");
         }
 
         // The OTP definition is mutable: a removed attempt limit, a lowered limit below the recorded failures, or proxy mode
@@ -194,7 +180,7 @@ public class ContactVerificationService {
         final Integer attemptLimit = otp.getOtpDefinition().getOtpPolicy().getAttemptLimit();
         if (otp.getOtpDefinition().isDataAdapterProxyEnabled() || attemptLimit == null || otp.getFailedAttemptCounter() >= attemptLimit) {
             invalidateOtp(otp.getOtpId());
-            return failed();
+            return failed(request.getVerificationId(), "attempt limit reached or OTP definition no longer valid");
         }
 
         final OtpAuthenticationRequest authRequest = new OtpAuthenticationRequest();
@@ -206,13 +192,14 @@ public class ContactVerificationService {
         try {
             authResponse = serviceCatalogue.getAuthenticationService().authenticateWithOtpInternal(authRequest, otp);
         } catch (OtpNotFoundException ex) {
-            logger.debug("Contact verification OTP disappeared during confirmation, verification ID: {}", request.getVerificationId(), ex);
-            return failed();
+            logger.debug("Contact verification OTP disappeared during confirmation", ex);
+            return failed(request.getVerificationId(), "verification no longer exists");
         }
 
         final ConfirmContactVerificationResponse response = new ConfirmContactVerificationResponse();
         response.setRemainingAttempts(authResponse.getRemainingAttempts());
         if (authResponse.getAuthenticationResult() == AuthenticationResult.SUCCEEDED) {
+            logger.info("Contact verification OTP was accepted, verification ID: {}", request.getVerificationId());
             serviceCatalogue.getUserContactService().markContactVerified(contact, ContactVerificationMethod.OTP);
             audit.info("Contact verification confirmed", AuditDetail.builder()
                     .type(AUDIT_TYPE_USER_IDENTITY)
@@ -223,11 +210,14 @@ public class ContactVerificationService {
             response.setVerified(true);
             response.setVerificationMethod(ContactVerificationMethod.OTP);
             response.setTimestampVerified(contact.getTimestampVerified());
+        } else {
+            logger.info("Contact verification OTP was not accepted, verification ID: {}, remaining attempts: {}", request.getVerificationId(), authResponse.getRemainingAttempts());
         }
         return response;
     }
 
-    private ConfirmContactVerificationResponse failed() {
+    private ConfirmContactVerificationResponse failed(String verificationId, String reason) {
+        logger.info("Contact verification rejected, verification ID: {}, reason: {}", verificationId, reason);
         final ConfirmContactVerificationResponse response = new ConfirmContactVerificationResponse();
         response.setVerified(false);
         return response;
@@ -241,24 +231,24 @@ public class ContactVerificationService {
     }
 
     /**
-     * Invalidate pending (ACTIVE) verification OTPs bound to the given contact state, so that they cannot be revived
-     * when the contact value is later changed back or the contact is re-created.
-     * @param contact Contact entity with the state to invalidate.
+     * Invalidate pending contact verification OTPs of the contact's user, so that they cannot be revived
+     * when the contact value is later changed back or the contact is re-created. Pending verifications of the user's
+     * other contacts are invalidated as well.
+     * @param contact Contact entity whose user's pending verifications are invalidated.
      */
     public void invalidatePendingVerifications(UserContactEntity contact) {
         try {
-            removeActiveVerifications(contact.getUser().getUserId(), computeBindingHash(contact));
+            removeActiveVerifications(contact.getUser().getUserId());
         } catch (OperationNotFoundException | InvalidRequestException ex) {
             // Roll back instead of leaving a stale pending verification in place.
             throw new IllegalStateException("Failed to invalidate pending contact verifications", ex);
         }
     }
 
-    private void removeActiveVerifications(String userId, String bindingHash) throws OperationNotFoundException, InvalidRequestException {
+    private void removeActiveVerifications(String userId) throws OperationNotFoundException, InvalidRequestException {
         final List<String> otpIds;
-        // Filtered in memory: otp_data is a CLOB on Oracle and cannot be compared in SQL.
-        try (final Stream<OtpEntity> activeOtps = otpRepository.findAllByUserIdAndStatus(userId, OtpStatus.ACTIVE)) {
-            otpIds = activeOtps.filter(otp -> otp.getVerificationMethod() != null && bindingHash.equals(otp.getOtpData())).map(OtpEntity::getOtpId).toList();
+        try (final Stream<OtpEntity> activeOtps = otpRepository.findAllByUserIdAndStatusAndOtpPurpose(userId, OtpStatus.ACTIVE, OtpPurpose.CONTACT_VERIFICATION)) {
+            otpIds = activeOtps.map(OtpEntity::getOtpId).toList();
         }
         for (String otpId : otpIds) {
             invalidateOtp(otpId);
@@ -279,14 +269,18 @@ public class ContactVerificationService {
     }
 
     /**
-     * Compute a SHA-256 hex hash binding the OTP to the contact name, type and value. Each field is prefixed with its
-     * length so that distinct contacts can never serialize identically.
+     * Compute a SHA-256 hex hash binding the OTP to the contact name, type and value. Each field is prefixed
+     * with its length in bytes, so the encoding is unambiguous for any field content.
      */
     private String computeBindingHash(UserContactEntity contact) {
-        final String type = contact.getType().name();
-        final String input = contact.getName().length() + ":" + contact.getName() + type.length() + ":" + type + contact.getValue().length() + ":" + contact.getValue();
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
+            final MessageDigest md = MessageDigest.getInstance("SHA-256");
+            for (final String field : List.of(contact.getName(), contact.getType().name(), contact.getValue())) {
+                final byte[] bytes = field.getBytes(StandardCharsets.UTF_8);
+                md.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+                md.update(bytes);
+            }
+            return HexFormat.of().formatHex(md.digest());
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 algorithm is not available", ex);
         }

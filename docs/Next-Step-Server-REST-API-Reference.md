@@ -7117,7 +7117,7 @@ The list of expected status codes:
 
 Start verification of a user contact by issuing a one-time password. The OTP value is returned in the response; Next Step does **not** deliver it. The caller is responsible for delivering the OTP value to the contact through its own channel and message template.
 
-The referenced OTP definition (`otpDefinitionName`) must use a random generation algorithm (`OTP_RANDOM_DIGIT_GROUPS`).
+Starting a verification cancels all pending contact verifications of the user, including those of other contacts and earlier OTPs of the same contact. Changing or deleting any of the user's contacts also cancels the user's pending contact verifications.
 
 
 
@@ -7142,7 +7142,7 @@ The list of expected status codes:
 | 400  | `REQUEST_VALIDATION_FAILED` - request validation failed                                                                                                      |
 | 400  | `USER_IDENTITY_NOT_FOUND` - user identity with identifier specified in the request was not found                                                             |
 | 400  | `USER_CONTACT_NOT_FOUND` - user contact was not found                                                                                                        |
-| 400  | `INVALID_CONFIGURATION` - the OTP definition uses the `OTP_DATA_DIGEST` algorithm, has no attempt limit or expiration time, or is data adapter proxy enabled |
+| 400  | `INVALID_CONFIGURATION` - the OTP definition has no attempt limit or expiration time, or is data adapter proxy enabled                                       |
 | 400  | `OTP_DEFINITION_NOT_FOUND` - the OTP definition was not found                                                                                                |
 | 500  | Server error - unexpected error occurred                                                                                                                     |
 
@@ -7182,7 +7182,7 @@ The list of expected status codes:
 <!-- begin api POST /user/contact/verification/confirm -->
 ### Confirm Verification of a User Contact
 
-Confirm verification of a user contact. The caller supplies the `otpValue`. On success the contact's `verificationMethod` is set to `OTP` and `timestampVerified` to the current server time. A wrong or unknown OTP returns `verified: false`.
+Confirm verification of a user contact. The caller supplies the `otpValue`. On success the contact's `verificationMethod` is set to `OTP` and `timestampVerified` to the current server time. A wrong or unknown OTP returns `verified: false`. A cancelled verification (see [Start Verification of a User Contact](#start-verification-of-a-user-contact)) can no longer be confirmed.
 
 
 

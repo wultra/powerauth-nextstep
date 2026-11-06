@@ -17,8 +17,10 @@
  */
 package com.wultra.security.powerauth.app.nextstep;
 
+import com.wultra.security.powerauth.app.nextstep.repository.OtpRepository;
 import com.wultra.security.powerauth.lib.nextstep.client.NextStepClientException;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.OtpGenerationParam;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpPurpose;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpStatus;
 import com.wultra.security.powerauth.lib.nextstep.model.enumeration.OtpGenerationAlgorithm;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpPolicyRequest;
@@ -26,6 +28,7 @@ import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateOtpDefinit
 import com.wultra.security.powerauth.lib.nextstep.model.response.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.security.SecureRandom;
 import java.util.LinkedHashSet;
@@ -40,6 +43,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author Roman Strobl, roman.strobl@wulta.com
  */
 public class NextStepOtpTest extends NextStepTest {
+
+    @Autowired
+    private OtpRepository otpRepository;
 
     @BeforeEach
     public void setUp() throws Exception {
@@ -124,6 +130,21 @@ public class NextStepOtpTest extends NextStepTest {
         assertEquals(OtpStatus.REMOVED, r4.getOtpDetail().getOtpStatus());
         assertEquals("TEST_OTP", r4.getOtpDetail().getOtpName());
         assertEquals("test_user_1", r4.getOtpDetail().getUserId());
+    }
+
+    @Test
+    public void testOtpPurposeIsGenericWithoutOperation() throws NextStepClientException {
+        final CreateOtpResponse response = nextStepClient.createOtp("test_user_1", "TEST_OTP", null, "test_data").getResponseObject();
+
+        assertEquals(OtpPurpose.GENERIC, otpRepository.findById(response.getOtpId()).orElseThrow().getOtpPurpose());
+    }
+
+    @Test
+    public void testOtpPurposeIsOperationWithOperation() throws NextStepClientException {
+        final String operationId = nextStepClient.createOperation("auth_otp", "test_data", null).getResponseObject().getOperationId();
+        final CreateOtpResponse response = nextStepClient.createOtp("test_user_1", "TEST_OTP", null, null, operationId).getResponseObject();
+
+        assertEquals(OtpPurpose.OPERATION, otpRepository.findById(response.getOtpId()).orElseThrow().getOtpPurpose());
     }
 
     @Test

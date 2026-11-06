@@ -52,7 +52,7 @@ public class StartContactVerificationRequest {
     private ContactType contactType;
 
     /**
-     * Name of the OTP definition used to issue the verification OTP. The referenced definition must use a random generation algorithm.
+     * Name of the OTP definition used to issue the verification OTP.
      */
     @NotBlank
     @Size(min = 2, max = 256)
