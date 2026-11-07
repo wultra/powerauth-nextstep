@@ -323,9 +323,7 @@ public class AuthenticationService {
     @Transactional
     public OtpAuthenticationResponse authenticateWithOtp(OtpAuthenticationRequest request) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException, CredentialNotFoundException, OperationAlreadyCanceledException, OperationAlreadyFinishedException, InvalidConfigurationException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
         final OtpEntity otp = serviceCatalogue.getOtpService().findOtp(request.getOtpId(), request.getOperationId());
-        if (otp.getVerificationMethod() != null) {
-            throw new InvalidRequestException("Contact verification OTP must be confirmed via the contact verification endpoint, OTP ID: " + otp.getOtpId());
-        }
+        rejectContactVerificationOtp(otp);
         return authenticateWithOtpInternal(request, otp);
     }
 
@@ -350,8 +348,7 @@ public class AuthenticationService {
      * @throws EncryptionException Thrown when decryption fails.
      */
     @Transactional
-    public OtpAuthenticationResponse authenticateWithOtpInternal(OtpAuthenticationRequest request, OtpEntity otp) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException, CredentialNotFoundException, OperationAlreadyCanceledException, OperationAlreadyFinishedException, InvalidConfigurationException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
-        final OtpService otpService = serviceCatalogue.getOtpService();
+    OtpAuthenticationResponse authenticateWithOtpInternal(OtpAuthenticationRequest request, OtpEntity otp) throws OtpNotFoundException, OperationNotFoundException, InvalidRequestException, CredentialNotFoundException, OperationAlreadyCanceledException, OperationAlreadyFinishedException, InvalidConfigurationException, AuthMethodNotFoundException, OperationAlreadyFailedException, OperationNotValidException, EncryptionException {
         final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
         final OperationPersistenceService operationPersistenceService = serviceCatalogue.getOperationPersistenceService();
         final CredentialService credentialService = serviceCatalogue.getCredentialService();
@@ -360,7 +357,7 @@ public class AuthenticationService {
 
         if (otp.getOtpDefinition().isDataAdapterProxyEnabled()) {
             logger.info("OTP authentication proxied through Data Adapter, OTP ID: {}", otp.getOtpId());
-            return authenticateWithOtpCustom(otp.getOtpDefinition(), otp.getOtpId(), request.getOtpValue(), otp.getOperation().getOperationId(), request.isUpdateOperation(), otp.getUserId(), request.getAuthMethod());
+            return authenticateWithOtpCustom(otp.getOtpId(), request.getOtpValue(), otp.getOperation().getOperationId(), request.isUpdateOperation(), otp.getUserId(), request.getAuthMethod());
         }
         otp.setAttemptCounter(otp.getAttemptCounter() + 1);
         // User ID uses String reference in entity to allow OTP for users not present in Next Step.
@@ -512,14 +509,13 @@ public class AuthenticationService {
 
     /**
      * Perform custom authentication with OTP.
-     * @param otpDefinition OTP definition.
      * @param otpId OTP ID.
      * @param otpValue OTP value.
      * @param operationId Operation ID.
      * @param userId User ID.
      * @param authMethod Authentication method.
      */
-    private OtpAuthenticationResponse authenticateWithOtpCustom(OtpDefinitionEntity otpDefinition, String otpId, String otpValue,
+    private OtpAuthenticationResponse authenticateWithOtpCustom(String otpId, String otpValue,
                                                                 String operationId, boolean updateOperation, String userId, AuthMethod authMethod) throws InvalidRequestException, OperationNotFoundException, InvalidConfigurationException, OperationAlreadyFinishedException, OperationAlreadyFailedException, OperationNotValidException, AuthMethodNotFoundException, OperationAlreadyCanceledException {
         final OperationPersistenceService operationPersistenceService = serviceCatalogue.getOperationPersistenceService();
         final AuthenticationCustomizationService authenticationCustomizationService = serviceCatalogue.getAuthenticationCustomizationService();
@@ -590,6 +586,7 @@ public class AuthenticationService {
         final IdGeneratorService idGeneratorService = serviceCatalogue.getIdGeneratorService();
 
         final OtpEntity otp = otpService.findOtp(request.getOtpId(), request.getOperationId());
+        rejectContactVerificationOtp(otp);
         if (otp.getCredentialDefinition() == null || otp.getCredentialDefinition().getName() == null) {
             throw new InvalidRequestException("Credential definition is not set for operation with OTP Id and Operation Id: " + request.getOtpId() + ", " + request.getOperationId());
         }
@@ -919,6 +916,12 @@ public class AuthenticationService {
                 return AuthenticationResult.SUCCEEDED;
             }
             default -> throw new InvalidRequestException("Invalid authentication mode: " + authenticationMode);
+        }
+    }
+
+    private void rejectContactVerificationOtp(OtpEntity otp) throws InvalidRequestException {
+        if (otp.getOtpPurpose() == OtpPurpose.CONTACT_VERIFICATION) {
+            throw new InvalidRequestException("Contact verification OTP must be confirmed via the contact verification endpoint, OTP ID: " + otp.getOtpId());
         }
     }
 

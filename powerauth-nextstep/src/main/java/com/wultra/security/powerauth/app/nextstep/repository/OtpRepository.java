@@ -19,6 +19,7 @@ package com.wultra.security.powerauth.app.nextstep.repository;
 
 import com.wultra.security.powerauth.app.nextstep.repository.model.entity.OperationEntity;
 import com.wultra.security.powerauth.app.nextstep.repository.model.entity.OtpEntity;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpPurpose;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpStatus;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -70,11 +71,12 @@ public interface OtpRepository extends CrudRepository<OtpEntity, String> {
     Stream<OtpEntity> findAllByOperationAndStatus(OperationEntity operationEntity, OtpStatus status);
 
     /**
-     * Find OTP entities by user identity and status.
+     * Find OTP entities by user identity, status and purpose.
      * @param userId User identity identifier.
      * @param status OTP status.
+     * @param otpPurpose OTP purpose.
      * @return Stream of OTP entities.
      */
-    Stream<OtpEntity> findAllByUserIdAndStatus(String userId, OtpStatus status);
+    Stream<OtpEntity> findAllByUserIdAndStatusAndOtpPurpose(String userId, OtpStatus status, OtpPurpose otpPurpose);
 
 }

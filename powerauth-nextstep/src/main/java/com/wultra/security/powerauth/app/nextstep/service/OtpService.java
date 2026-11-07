@@ -28,6 +28,7 @@ import com.wultra.security.powerauth.app.nextstep.service.adapter.OtpCustomizati
 import com.wultra.security.powerauth.app.nextstep.service.catalogue.ServiceCatalogue;
 import com.wultra.security.powerauth.lib.dataadapter.model.entity.UserContact;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.*;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpPurpose;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpStatus;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.UserIdentityStatus;
 import com.wultra.security.powerauth.lib.nextstep.model.enumeration.AuthResult;
@@ -102,7 +103,30 @@ public class OtpService {
         final String credentialName = request.getCredentialName();
         final String otpData = request.getOtpData();
         final String operationId = request.getOperationId();
-        return createOtpInternal(otpDefinition, userId, credentialName, otpData, operationId);
+        return createOtpInternal(otpDefinition, userId, credentialName, otpData, operationId, null);
+    }
+
+    /**
+     * Create an OTP issued for verification of a user contact. The OTP is not bound to an operation.
+     * @param otpDefinition OTP definition.
+     * @param userId User ID.
+     * @param otpData Data the OTP is bound to.
+     * @return Create OTP response.
+     * @throws UserNotActiveException Thrown when user is not active.
+     * @throws CredentialDefinitionNotFoundException Thrown when credential definition is not found.
+     * @throws CredentialNotFoundException Thrown when credential is not found.
+     * @throws CredentialNotActiveException Thrown when credential is not active.
+     * @throws OperationNotFoundException Thrown when operation is not found.
+     * @throws InvalidRequestException Thrown when request is invalid.
+     * @throws OtpGenAlgorithmNotSupportedException Thrown when OTP generation algorithm is not supported.
+     * @throws InvalidConfigurationException Thrown when OTP policy is not configured properly.
+     * @throws OperationAlreadyFinishedException Thrown when operation is already finished.
+     * @throws OperationAlreadyFailedException Thrown when operation is already failed.
+     * @throws EncryptionException Thrown when encryption fails.
+     */
+    @Transactional
+    public CreateOtpResponse createContactVerificationOtp(OtpDefinitionEntity otpDefinition, String userId, String otpData) throws UserNotActiveException, CredentialDefinitionNotFoundException, OperationNotFoundException, InvalidRequestException, OtpGenAlgorithmNotSupportedException, InvalidConfigurationException, OperationAlreadyFinishedException, OperationAlreadyFailedException, CredentialNotActiveException, CredentialNotFoundException, EncryptionException {
+        return createOtpInternal(otpDefinition, userId, null, otpData, null, OtpPurpose.CONTACT_VERIFICATION);
     }
 
     /**
@@ -161,6 +185,7 @@ public class OtpService {
             otp.setCredentialDefinition(credentialDefinition);
             otp.setUserId(userId);
             otp.setOperation(operation);
+            otp.setOtpPurpose(operation != null ? OtpPurpose.OPERATION : OtpPurpose.GENERIC);
             otp.setStatus(OtpStatus.EXTERNAL);
             otp.setTimestampCreated(new Date());
             otpRepository.save(otp);
@@ -179,7 +204,7 @@ public class OtpService {
             return response;
         } else {
             // Create OTP in Next Step and send it via Data Adapter
-            final CreateOtpResponse otpResponse = createOtpInternal(otpDefinition, userId, credentialName, otpData, operationId);
+            final CreateOtpResponse otpResponse = createOtpInternal(otpDefinition, userId, credentialName, otpData, operationId, null);
             final OtpDeliveryResult result = otpCustomizationService.sendOtp(userId, contacts, operation, otpResponse.getOtpId(), otpResponse.getOtpValue(), language, resend);
             final CreateAndSendOtpResponse response = new CreateAndSendOtpResponse();
             response.setOtpName(otpDefinition.getName());
@@ -199,6 +224,7 @@ public class OtpService {
      * @param credentialName Credential definition name.
      * @param otpData OTP data.
      * @param operationId Operation ID.
+     * @param otpPurpose OTP purpose, when {@code null} it is derived from the presence of an operation.
      * @return Create OTP response.
      * @throws UserNotActiveException Thrown when user is not active.
      * @throws CredentialDefinitionNotFoundException Thrown when credential definition is not found.
@@ -212,7 +238,7 @@ public class OtpService {
      * @throws OperationAlreadyFinishedException Thrown when operation is already failed.
      * @throws EncryptionException Thrown when encryption fails.
      */
-    private CreateOtpResponse createOtpInternal(OtpDefinitionEntity otpDefinition, String userId, String credentialName, String otpData, String operationId) throws UserNotActiveException, CredentialDefinitionNotFoundException, OperationNotFoundException, InvalidRequestException, OtpGenAlgorithmNotSupportedException, InvalidConfigurationException, OperationAlreadyFinishedException, OperationAlreadyFailedException, CredentialNotActiveException, CredentialNotFoundException, EncryptionException {
+    private CreateOtpResponse createOtpInternal(OtpDefinitionEntity otpDefinition, String userId, String credentialName, String otpData, String operationId, OtpPurpose otpPurpose) throws UserNotActiveException, CredentialDefinitionNotFoundException, OperationNotFoundException, InvalidRequestException, OtpGenAlgorithmNotSupportedException, InvalidConfigurationException, OperationAlreadyFinishedException, OperationAlreadyFailedException, CredentialNotActiveException, CredentialNotFoundException, EncryptionException {
         final UserIdentityLookupService userIdentityLookupService = serviceCatalogue.getUserIdentityLookupService();
         final CredentialService credentialService = serviceCatalogue.getCredentialService();
         final OtpGenerationService otpGenerationService = serviceCatalogue.getOtpGenerationService();
@@ -277,6 +303,7 @@ public class OtpService {
         otp.setUserId(userId);
         otp.setCredentialDefinition(credentialDefinition);
         otp.setOperation(operation);
+        otp.setOtpPurpose(otpPurpose != null ? otpPurpose : operation != null ? OtpPurpose.OPERATION : OtpPurpose.GENERIC);
         final OtpValue otpValueDb = otpValueConverter.toDBValue(otpValueDetail.getOtpValue(), otpId, otpDefinition);
         otp.setValue(otpValueDb.getValue());
         otp.setEncryptionAlgorithm(otpValueDb.getEncryptionAlgorithm());

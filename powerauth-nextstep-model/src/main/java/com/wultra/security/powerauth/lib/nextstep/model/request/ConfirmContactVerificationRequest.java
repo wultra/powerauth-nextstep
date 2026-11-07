@@ -63,6 +63,7 @@ public class ConfirmContactVerificationRequest {
      * OTP value entered by the user.
      */
     @NotBlank
+    @Size(min = 1, max = 256)
     @ToString.Exclude
     private String otpValue;
 

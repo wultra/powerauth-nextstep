@@ -297,6 +297,30 @@ class NextStepUserIdentityTest extends NextStepTest {
         assertNull(listed.getTimestampVerified());
     }
 
+    @Test
+    void testUpdateWithMethodMarksContactVerified() throws NextStepClientException {
+        final String userId = createUserIdentity();
+        createContact(userId, "test@test.test", null);
+
+        final UpdateUserContactResponse updated = updateContact(userId, "changed@test.test", ContactVerificationMethod.MANUAL);
+        assertEquals(ContactVerificationMethod.MANUAL, updated.getVerificationMethod());
+        assertNotNull(updated.getTimestampVerified());
+
+        final UserContactDetail listed = singleContact(userId);
+        assertEquals(ContactVerificationMethod.MANUAL, listed.getVerificationMethod());
+        assertEquals(updated.getTimestampVerified(), listed.getTimestampVerified());
+    }
+
+    @Test
+    void testUpdateWithUnchangedValueAndNoMethodKeepsVerification() throws NextStepClientException {
+        final String userId = createUserIdentity();
+        final CreateUserContactResponse created = createContact(userId, "test@test.test", ContactVerificationMethod.MANUAL);
+
+        final UpdateUserContactResponse updated = updateContact(userId, "test@test.test", null);
+        assertEquals(ContactVerificationMethod.MANUAL, updated.getVerificationMethod());
+        assertEquals(created.getTimestampVerified(), updated.getTimestampVerified());
+    }
+
     private String createUserIdentity() throws NextStepClientException {
         final String userId = UUID.randomUUID().toString();
         final CreateUserRequest createUserRequest = new CreateUserRequest();
