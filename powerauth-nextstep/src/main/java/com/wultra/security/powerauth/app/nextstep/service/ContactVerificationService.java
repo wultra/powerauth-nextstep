@@ -50,7 +50,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -269,7 +269,7 @@ public class ContactVerificationService {
     }
 
     /**
-     * Compute a SHA-256 hex hash binding the OTP to the contact name, type and value. Each field is prefixed
+     * Compute a SHA-256 Base64 hash binding the OTP to the contact name, type and value. Each field is prefixed
      * with its length in bytes, so the encoding is unambiguous for any field content.
      */
     private String computeBindingHash(UserContactEntity contact) {
@@ -280,7 +280,7 @@ public class ContactVerificationService {
                 md.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
                 md.update(bytes);
             }
-            return HexFormat.of().formatHex(md.digest());
+            return Base64.getEncoder().encodeToString(md.digest());
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 algorithm is not available", ex);
         }
