@@ -295,7 +295,7 @@ public class OtpService {
         } else if (otpDefinition.getOtpPolicy().getGenAlgorithm() == OtpGenerationAlgorithm.OTP_DATA_DIGEST) {
             throw new InvalidRequestException("OTP data is not available for OTP definition: " + otpDefinition.getName());
         }
-        final OtpValueDetail otpValueDetail = otpGenerationService.generateOtpValue(otpData, otpDefinition.getOtpPolicy());
+        final OtpValueDetail otpValueDetail = otpGenerationService.generateOtpValue(otpDataToUse, otpDefinition.getOtpPolicy());
         final String otpId = idGeneratorService.generateOtpId();
         OtpEntity otp = new OtpEntity();
         otp.setOtpId(otpId);
