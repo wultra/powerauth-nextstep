@@ -78,4 +78,13 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="6" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
+        <comment>Set otp_purpose to OPERATION for existing OTPs bound to an operation</comment>
+        <update tableName="ns_otp_storage">
+            <column name="otp_purpose" value="OPERATION"/>
+            <where>operation_id IS NOT NULL</where>
+        </update>
+        <rollback/>
+    </changeSet>
+
 </databaseChangeLog>

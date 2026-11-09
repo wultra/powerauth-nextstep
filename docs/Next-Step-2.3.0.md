@@ -10,7 +10,7 @@ The main Liquibase script is located in path [db/changelog/db.changelog-master.x
 
 ### `ns_user_contact` and `ns_otp_storage` Tables
 
-A new Liquibase changeset adds three columns to support contact verification. The `verification_method` and `timestamp_verified` columns are nullable with no default value, so existing contacts remain unverified (`null`). The `otp_purpose` column defaults to `GENERIC`, so existing OTPs are migrated without a data backfill.
+A new Liquibase changeset adds three columns to support contact verification. The `verification_method` and `timestamp_verified` columns are nullable with no default value, so existing contacts remain unverified (`null`). The `otp_purpose` column defaults to `GENERIC`, and existing OTPs bound to an operation (`operation_id` is not null) are set to `OPERATION`.
 
 - `ns_user_contact.verification_method` (`varchar(32)`) – verification method that confirmed the contact.
 - `ns_user_contact.timestamp_verified` (`timestamp`) – time at which the contact was verified.
