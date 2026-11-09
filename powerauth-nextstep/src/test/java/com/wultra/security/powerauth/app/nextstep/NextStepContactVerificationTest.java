@@ -29,6 +29,7 @@ import com.wultra.security.powerauth.lib.nextstep.model.exception.OtpDefinitionA
 import com.wultra.security.powerauth.lib.nextstep.model.exception.OtpDefinitionNotFoundException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.OtpPolicyAlreadyExistsException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserContactNotFoundException;
+import com.wultra.security.powerauth.lib.nextstep.model.exception.UserNotActiveException;
 import com.wultra.security.powerauth.lib.nextstep.model.exception.UserNotFoundException;
 import com.wultra.security.powerauth.lib.nextstep.model.request.ConfirmContactVerificationRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpDefinitionRequest;
@@ -422,6 +423,14 @@ class NextStepContactVerificationTest extends NextStepTest {
         final StartContactVerificationResponse userVerification = start(deletedUser, OTP_DEFINITION);
         nextStepClient.deleteUser(deletedUser);
         assertFalse(confirm(deletedUser, userVerification.getVerificationId(), userVerification.getOtpValue()).isVerified());
+    }
+
+    @Test
+    void rejectsStartForBlockedUser() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        nextStepClient.blockUser(userId);
+
+        assertStartFails(userId, CONTACT_NAME, OTP_DEFINITION, UserNotActiveException.CODE);
     }
 
     @Test
