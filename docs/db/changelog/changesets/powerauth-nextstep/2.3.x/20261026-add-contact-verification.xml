@@ -36,6 +36,34 @@
     <changeSet id="3" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
         <preConditions onFail="MARK_RAN">
             <not>
+                <columnExists tableName="ns_otp_storage" columnName="verification_method"/>
+            </not>
+        </preConditions>
+        <comment>Add column verification_method to ns_otp_storage to persist the contact verification method started for an OTP</comment>
+        <addColumn tableName="ns_otp_storage">
+            <column name="verification_method" type="varchar(32)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="ns_otp_storage" columnName="verification_method"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="4" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="ns_otp_storage" columnName="verification_method"/>
+        </preConditions>
+        <comment>Drop column verification_method from ns_otp_storage, it is replaced by otp_purpose</comment>
+        <dropColumn tableName="ns_otp_storage" columnName="verification_method"/>
+        <rollback>
+            <addColumn tableName="ns_otp_storage">
+                <column name="verification_method" type="varchar(32)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="5" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
+        <preConditions onFail="MARK_RAN">
+            <not>
                 <columnExists tableName="ns_otp_storage" columnName="otp_purpose"/>
             </not>
         </preConditions>

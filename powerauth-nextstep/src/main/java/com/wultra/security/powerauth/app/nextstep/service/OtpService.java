@@ -303,7 +303,7 @@ public class OtpService {
         otp.setUserId(userId);
         otp.setCredentialDefinition(credentialDefinition);
         otp.setOperation(operation);
-        otp.setOtpPurpose(otpPurpose != null ? otpPurpose : operation != null ? OtpPurpose.OPERATION : OtpPurpose.GENERIC);
+        otp.setOtpPurpose(resolveOtpPurpose(otpPurpose, operation));
         final OtpValue otpValueDb = otpValueConverter.toDBValue(otpValueDetail.getOtpValue(), otpId, otpDefinition);
         otp.setValue(otpValueDb.getValue());
         otp.setEncryptionAlgorithm(otpValueDb.getEncryptionAlgorithm());
@@ -334,6 +334,19 @@ public class OtpService {
         response.setOtpValue(otpValueDetail.getOtpValue());
         response.setOtpStatus(otp.getStatus());
         return response;
+    }
+
+    /**
+     * Resolve the purpose of a new OTP.
+     * @param otpPurpose Explicit OTP purpose, may be {@code null}.
+     * @param operation Operation the OTP is bound to, may be {@code null}.
+     * @return Explicit OTP purpose, otherwise {@code OPERATION} when the OTP is bound to an operation, otherwise {@code GENERIC}.
+     */
+    private static OtpPurpose resolveOtpPurpose(OtpPurpose otpPurpose, OperationEntity operation) {
+        if (otpPurpose != null) {
+            return otpPurpose;
+        }
+        return operation != null ? OtpPurpose.OPERATION : OtpPurpose.GENERIC;
     }
 
     /**
