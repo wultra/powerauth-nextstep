@@ -35,12 +35,19 @@ import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpDefinit
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateOtpPolicyRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.CreateUserRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.request.StartContactVerificationRequest;
+import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateOtpPolicyRequest;
+import com.wultra.security.powerauth.lib.nextstep.model.response.CreateOtpResponse;
 import com.wultra.security.powerauth.lib.nextstep.model.request.UpdateUserRequest;
 import com.wultra.security.powerauth.lib.nextstep.model.response.ConfirmContactVerificationResponse;
 import com.wultra.security.powerauth.lib.nextstep.model.response.StartContactVerificationResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -415,6 +422,71 @@ class NextStepContactVerificationTest extends NextStepTest {
         final StartContactVerificationResponse userVerification = start(deletedUser, OTP_DEFINITION);
         nextStepClient.deleteUser(deletedUser);
         assertFalse(confirm(deletedUser, userVerification.getVerificationId(), userVerification.getOtpValue()).isVerified());
+    }
+
+    @Test
+    void rejectsConfirmationForBlockedUser() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = start(userId, OTP_DEFINITION);
+        nextStepClient.blockUser(userId);
+
+        assertFalse(confirm(userId, start.getVerificationId(), start.getOtpValue()).isVerified());
+        assertNull(singleContact(userId).getVerificationMethod());
+    }
+
+    @Test
+    void rejectsConfirmationAfterAttemptLimitRemovedFromPolicy() throws NextStepClientException {
+        final String suffix = UUID.randomUUID().toString().substring(0, 8);
+        final CreateOtpPolicyRequest policy = new CreateOtpPolicyRequest();
+        policy.setOtpPolicyName("CV_MUTABLE_POLICY_" + suffix);
+        policy.setAttemptLimit(3);
+        policy.setLength(8);
+        policy.setExpirationTime(300L);
+        policy.setGenAlgorithm(OtpGenerationAlgorithm.OTP_RANDOM_DIGIT_GROUPS);
+        final OtpGenerationParam genParam = new OtpGenerationParam();
+        genParam.setGroupSize(2);
+        policy.setGenParam(genParam);
+        final CreateOtpDefinitionRequest definition = new CreateOtpDefinitionRequest();
+        definition.setOtpDefinitionName("CV_MUTABLE_OTP_" + suffix);
+        definition.setApplicationName("TEST_APP");
+        definition.setOtpPolicyName(policy.getOtpPolicyName());
+        createPolicyAndDefinition(policy, definition);
+        final String userId = createUserWithContact("user@test.test");
+        final StartContactVerificationResponse start = start(userId, definition.getOtpDefinitionName());
+
+        final UpdateOtpPolicyRequest update = new UpdateOtpPolicyRequest();
+        update.setOtpPolicyName(policy.getOtpPolicyName());
+        update.setLength(8);
+        update.setExpirationTime(300L);
+        nextStepClient.updateOtpPolicy(update);
+
+        assertFalse(confirm(userId, start.getVerificationId(), start.getOtpValue()).isVerified());
+        assertNull(singleContact(userId).getVerificationMethod());
+    }
+
+    @Test
+    void rejectsGenericOtpWithMatchingBindingHash() throws NextStepClientException {
+        final String userId = createUserWithContact("user@test.test");
+        final CreateOtpResponse generic = nextStepClient.createOtp(userId, OTP_DEFINITION, null,
+                bindingHash(CONTACT_NAME, CONTACT_TYPE, "user@test.test")).getResponseObject();
+
+        assertFalse(confirm(userId, generic.getOtpId(), generic.getOtpValue()).isVerified());
+        assertNull(singleContact(userId).getVerificationMethod());
+    }
+
+    // Mirrors the production binding hash: SHA-256 over length-prefixed name, type and value, Base64 encoded.
+    private static String bindingHash(final String name, final ContactType type, final String value) {
+        try {
+            final MessageDigest md = MessageDigest.getInstance("SHA-256");
+            for (final String field : List.of(name, type.name(), value)) {
+                final byte[] bytes = field.getBytes(StandardCharsets.UTF_8);
+                md.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
+                md.update(bytes);
+            }
+            return Base64.getEncoder().encodeToString(md.digest());
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 
     private StartContactVerificationResponse start(final String userId, final String otpDefinitionName) throws NextStepClientException {

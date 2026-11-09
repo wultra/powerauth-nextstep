@@ -156,7 +156,7 @@ public class ContactVerificationService {
             contact = findContact(request.getUserId(), request.getContactName(), request.getContactType());
         } catch (UserNotFoundException | UserContactNotFoundException ex) {
             logger.debug("Contact verification failed, user or contact not found", ex);
-            return failed(request.getVerificationId(), "user or contact not found");
+            return failed(request, "user or contact not found");
         }
 
         // The OTP must be bound to the current user and contact value, otherwise it was issued for a different contact or value.
@@ -165,14 +165,14 @@ public class ContactVerificationService {
             otp = serviceCatalogue.getOtpService().findOtp(request.getVerificationId(), null);
         } catch (OtpNotFoundException ex) {
             logger.debug("Contact verification OTP not found", ex);
-            return failed(request.getVerificationId(), "verification not found");
+            return failed(request, "verification not found");
         }
         if (!request.getUserId().equals(otp.getUserId()) || !computeBindingHash(contact).equals(otp.getOtpData())) {
-            return failed(request.getVerificationId(), "verification does not match the user or contact");
+            return failed(request, "verification does not match the user or contact");
         }
 
         if (otp.getOtpPurpose() != OtpPurpose.CONTACT_VERIFICATION) {
-            return failed(request.getVerificationId(), "OTP was not issued for contact verification");
+            return failed(request, "OTP was not issued for contact verification");
         }
 
         // The OTP definition is mutable: a removed attempt limit, a lowered limit below the recorded failures, or proxy mode
@@ -180,7 +180,7 @@ public class ContactVerificationService {
         final Integer attemptLimit = otp.getOtpDefinition().getOtpPolicy().getAttemptLimit();
         if (otp.getOtpDefinition().isDataAdapterProxyEnabled() || attemptLimit == null || otp.getFailedAttemptCounter() >= attemptLimit) {
             invalidateOtp(otp.getOtpId());
-            return failed(request.getVerificationId(), "attempt limit reached or OTP definition no longer valid");
+            return failed(request, "attempt limit reached or OTP definition no longer valid");
         }
 
         final OtpAuthenticationRequest authRequest = new OtpAuthenticationRequest();
@@ -193,7 +193,7 @@ public class ContactVerificationService {
             authResponse = serviceCatalogue.getAuthenticationService().authenticateWithOtpInternal(authRequest, otp);
         } catch (OtpNotFoundException ex) {
             logger.debug("Contact verification OTP disappeared during confirmation", ex);
-            return failed(request.getVerificationId(), "verification no longer exists");
+            return failed(request, "verification no longer exists");
         }
 
         final ConfirmContactVerificationResponse response = new ConfirmContactVerificationResponse();
@@ -216,8 +216,16 @@ public class ContactVerificationService {
         return response;
     }
 
-    private ConfirmContactVerificationResponse failed(String verificationId, String reason) {
-        logger.info("Contact verification rejected, verification ID: {}, reason: {}", verificationId, reason);
+    // Rejections before OTP evaluation; evaluated attempts are audited by AuthenticationService.
+    private ConfirmContactVerificationResponse failed(ConfirmContactVerificationRequest request, String reason) {
+        logger.info("Contact verification rejected, verification ID: {}, reason: {}", request.getVerificationId(), reason);
+        audit.info("Contact verification rejected", AuditDetail.builder()
+                .type(AUDIT_TYPE_USER_IDENTITY)
+                .param("userId", request.getUserId())
+                .param("contactName", request.getContactName())
+                .param("verificationId", request.getVerificationId())
+                .param("reason", reason)
+                .build());
         final ConfirmContactVerificationResponse response = new ConfirmContactVerificationResponse();
         response.setVerified(false);
         return response;
