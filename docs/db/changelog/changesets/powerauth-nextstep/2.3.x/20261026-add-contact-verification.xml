@@ -48,4 +48,43 @@
         </rollback>
     </changeSet>
 
+    <changeSet id="4" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="ns_otp_storage" columnName="verification_method"/>
+        </preConditions>
+        <comment>Drop column verification_method from ns_otp_storage, it is replaced by otp_purpose</comment>
+        <dropColumn tableName="ns_otp_storage" columnName="verification_method"/>
+        <rollback>
+            <addColumn tableName="ns_otp_storage">
+                <column name="verification_method" type="varchar(32)"/>
+            </addColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="5" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="ns_otp_storage" columnName="otp_purpose"/>
+            </not>
+        </preConditions>
+        <comment>Add column otp_purpose to ns_otp_storage to distinguish regular OTPs from contact verification OTPs</comment>
+        <addColumn tableName="ns_otp_storage">
+            <column name="otp_purpose" type="varchar(32)" defaultValue="GENERIC">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="ns_otp_storage" columnName="otp_purpose"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="6" author="Roman Strobl" logicalFilePath="powerauth-nextstep/2.3.x/20261026-add-contact-verification.xml">
+        <comment>Set otp_purpose to OPERATION for existing OTPs bound to an operation</comment>
+        <update tableName="ns_otp_storage">
+            <column name="otp_purpose" value="OPERATION"/>
+            <where>operation_id IS NOT NULL</where>
+        </update>
+        <rollback/>
+    </changeSet>
+
 </databaseChangeLog>

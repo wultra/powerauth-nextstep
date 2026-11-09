@@ -18,7 +18,7 @@
 package com.wultra.security.powerauth.app.nextstep.repository.model.entity;
 
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.EncryptionAlgorithm;
-import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.ContactVerificationMethod;
+import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpPurpose;
 import com.wultra.security.powerauth.lib.nextstep.model.entity.enumeration.OtpStatus;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -86,12 +86,12 @@ public class OtpEntity implements Serializable {
     private EncryptionAlgorithm encryptionAlgorithm;
 
     /**
-     * Contact verification method the OTP was issued for. Populated only by the user-contact verification flow
-     * (see {@code ContactVerificationService}); {@code null} for all other OTPs.
+     * Purpose the OTP was issued for. {@link OtpPurpose#CONTACT_VERIFICATION} is set only by the user-contact
+     * verification flow (see {@code ContactVerificationService}).
      */
-    @Column(name = "verification_method", length = 32)
+    @Column(name = "otp_purpose", length = 32, nullable = false)
     @Enumerated(EnumType.STRING)
-    private ContactVerificationMethod verificationMethod;
+    private OtpPurpose otpPurpose = OtpPurpose.GENERIC;
 
     @Column(name = "timestamp_created", nullable = false)
     private Date timestampCreated;

@@ -286,7 +286,7 @@ CREATE TABLE ns_otp_storage (
   attempt_counter INTEGER DEFAULT 0 NOT NULL,
   failed_attempt_counter INTEGER DEFAULT 0 NOT NULL,
   encryption_algorithm VARCHAR(256),
-  verification_method VARCHAR(32),
+  otp_purpose VARCHAR(32) DEFAULT 'GENERIC' NOT NULL,
   timestamp_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   timestamp_verified TIMESTAMP,
   timestamp_blocked TIMESTAMP,
