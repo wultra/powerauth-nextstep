@@ -357,7 +357,7 @@ public class AuthenticationService {
 
         if (otp.getOtpDefinition().isDataAdapterProxyEnabled()) {
             logger.info("OTP authentication proxied through Data Adapter, OTP ID: {}", otp.getOtpId());
-            return authenticateWithOtpCustom(otp.getOtpId(), request.getOtpValue(), otp.getOperation().getOperationId(), request.isUpdateOperation(), otp.getUserId(), request.getAuthMethod());
+            return authenticateWithOtpCustom(request, otp);
         }
         otp.setAttemptCounter(otp.getAttemptCounter() + 1);
         // User ID uses String reference in entity to allow OTP for users not present in Next Step.
@@ -509,27 +509,24 @@ public class AuthenticationService {
 
     /**
      * Perform custom authentication with OTP.
-     * @param otpId OTP ID.
-     * @param otpValue OTP value.
-     * @param operationId Operation ID.
-     * @param userId User ID.
-     * @param authMethod Authentication method.
+     * @param request Authentication with OTP request.
+     * @param otp OTP entity.
      */
-    private OtpAuthenticationResponse authenticateWithOtpCustom(String otpId, String otpValue,
-                                                                String operationId, boolean updateOperation, String userId, AuthMethod authMethod) throws InvalidRequestException, OperationNotFoundException, InvalidConfigurationException, OperationAlreadyFinishedException, OperationAlreadyFailedException, OperationNotValidException, AuthMethodNotFoundException, OperationAlreadyCanceledException {
-        final OperationPersistenceService operationPersistenceService = serviceCatalogue.getOperationPersistenceService();
+    private OtpAuthenticationResponse authenticateWithOtpCustom(OtpAuthenticationRequest request, OtpEntity otp) throws InvalidRequestException, OperationNotFoundException, InvalidConfigurationException, OperationAlreadyFinishedException, OperationAlreadyFailedException, OperationNotValidException, AuthMethodNotFoundException, OperationAlreadyCanceledException {
         final AuthenticationCustomizationService authenticationCustomizationService = serviceCatalogue.getAuthenticationCustomizationService();
-        if (operationId == null) {
-            throw new InvalidRequestException("Operation ID is missing in Data Adapter authentication with credential request");
+        final OperationEntity operation = otp.getOperation();
+        if (operation == null) {
+            throw new InvalidRequestException("Operation is missing in Data Adapter OTP authentication, OTP ID: " + otp.getOtpId());
         }
-        final OperationEntity operation = operationPersistenceService.getOperation(operationId);
+        final String otpId = otp.getOtpId();
+        final String userId = otp.getUserId();
         final String organizationId = operation.getOrganization() != null ? operation.getOrganization().getOrganizationId() : null;
-        final OtpAuthenticationResponse response = authenticationCustomizationService.authenticateWithOtp(otpId, otpValue, userId, organizationId, operation);
+        final OtpAuthenticationResponse response = authenticationCustomizationService.authenticateWithOtp(otpId, request.getOtpValue(), userId, organizationId, operation);
         final boolean lastAttempt = response.getUserIdentityStatus() != UserIdentityStatus.ACTIVE ||
                 (response.getRemainingAttempts() != null && response.getRemainingAttempts() == 0);
         boolean operationFailed = false;
-        if (updateOperation) {
-            final UpdateOperationResponse operationResponse = updateOperation(userId, operation, authMethod, response.getAuthenticationResult(),
+        if (request.isUpdateOperation()) {
+            final UpdateOperationResponse operationResponse = updateOperation(userId, operation, request.getAuthMethod(), response.getAuthenticationResult(),
                     null, lastAttempt, Collections.singletonList(AuthInstrument.OTP_KEY));
             if (operationResponse == null || operationResponse.getResult() == AuthResult.FAILED) {
                 logger.debug("Operation update result is FAILED, operation ID: {}", operation.getOperationId());
@@ -592,7 +589,7 @@ public class AuthenticationService {
         }
         if (otp.getOtpDefinition().isDataAdapterProxyEnabled()) {
             logger.info("Combined authentication proxied through Data Adapter, OTP ID: {}", request.getOtpId());
-            return authenticateCombinedCustom(otp.getCredentialDefinition(), otp.getOtpId(), request.getOtpValue(), request.getCredentialValue(), otp.getOperation().getOperationId(), otp.getUserId(), request.getAuthMethod());
+            return authenticateCombinedCustom(request, otp);
         }
         otp.setAttemptCounter(otp.getAttemptCounter() + 1);
 
@@ -764,27 +761,24 @@ public class AuthenticationService {
 
     /**
      * Perform custom authentication with OTP and credential.
-     * @param otpId OTP ID.
-     * @param otpValue OTP value.
-     * @param operationId Operation ID.
-     * @param userId User ID.
-     * @param authMethod Authentication method.
+     * @param request Combined authentication request.
+     * @param otp OTP entity.
      */
-    private CombinedAuthenticationResponse authenticateCombinedCustom(CredentialDefinitionEntity credentialDefinition, String otpId, String otpValue, String credentialValue,
-                                                                    String operationId, String userId, AuthMethod authMethod) throws InvalidRequestException, OperationNotFoundException, InvalidConfigurationException, OperationAlreadyFinishedException, OperationAlreadyFailedException, OperationNotValidException, AuthMethodNotFoundException, OperationAlreadyCanceledException {
-        final OperationPersistenceService operationPersistenceService = serviceCatalogue.getOperationPersistenceService();
+    private CombinedAuthenticationResponse authenticateCombinedCustom(CombinedAuthenticationRequest request, OtpEntity otp) throws InvalidRequestException, OperationNotFoundException, InvalidConfigurationException, OperationAlreadyFinishedException, OperationAlreadyFailedException, OperationNotValidException, AuthMethodNotFoundException, OperationAlreadyCanceledException {
         final AuthenticationCustomizationService authenticationCustomizationService = serviceCatalogue.getAuthenticationCustomizationService();
-        if (operationId == null) {
-            throw new InvalidRequestException("Operation ID is missing in Data Adapter authentication with credential request");
+        final OperationEntity operation = otp.getOperation();
+        if (operation == null) {
+            throw new InvalidRequestException("Operation is missing in Data Adapter combined authentication, OTP ID: " + otp.getOtpId());
         }
-        final OperationEntity operation = operationPersistenceService.getOperation(operationId);
+        final String otpId = otp.getOtpId();
+        final String userId = otp.getUserId();
         final String organizationId = operation.getOrganization() != null ? operation.getOrganization().getOrganizationId() : null;
-        final AuthenticationContext authenticationContext = createAuthenticationContext(credentialDefinition);
-        final CombinedAuthenticationResponse response = authenticationCustomizationService.authenticateCombined(otpId, otpValue, userId, organizationId, credentialValue, operation, authenticationContext);
+        final AuthenticationContext authenticationContext = createAuthenticationContext(otp.getCredentialDefinition());
+        final CombinedAuthenticationResponse response = authenticationCustomizationService.authenticateCombined(otpId, request.getOtpValue(), userId, organizationId, request.getCredentialValue(), operation, authenticationContext);
         final boolean lastAttempt = response.getUserIdentityStatus() != UserIdentityStatus.ACTIVE ||
                 (response.getRemainingAttempts() != null && response.getRemainingAttempts() == 0);
         boolean operationFailed = false;
-        final UpdateOperationResponse operationResponse = updateOperation(userId, operation, authMethod, response.getAuthenticationResult(),
+        final UpdateOperationResponse operationResponse = updateOperation(userId, operation, request.getAuthMethod(), response.getAuthenticationResult(),
                 null, lastAttempt, Arrays.asList(AuthInstrument.CREDENTIAL, AuthInstrument.OTP_KEY));
         if (operationResponse == null || operationResponse.getResult() == AuthResult.FAILED) {
             logger.debug("Operation update result is FAILED, operation ID: {}", operation.getOperationId());
